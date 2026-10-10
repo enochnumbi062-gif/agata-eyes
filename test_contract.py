@@ -34,6 +34,7 @@ def test_status_reports_storage_mode():
     body = client.get("/api/v1/status").json()
     assert body["database"] in {"memory", "supabase"}
     assert "enabled" in body["ai"]
+    assert set(body["supabase_env"]) == {"url", "key"}
 
 
 def test_ai_requires_configuration(monkeypatch):
