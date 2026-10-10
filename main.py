@@ -49,7 +49,8 @@ AI_MAX_PER_MINUTE = env_int("AI_MAX_PER_MINUTE", 6, 1, 60)
 AI_DAILY_LIMIT = env_int("AI_DAILY_LIMIT", 300, 1, 100000)
 MAX_OBJECTS = env_int("MAX_OBJECTS", 3000, 100, 20000)
 ALLOWED_ORIGINS = [x.strip() for x in os.getenv("ALLOWED_ORIGINS", "").split(",") if x.strip()]
-CELESTRAK_URL = "https://celestrak.org/NORAD/elements/gp.php"
+CELESTRAK_URL = os.getenv("CELESTRAK_URL", "https://celestrak.org/NORAD/elements/gp.php")
+FAIL_BACKOFF_SECONDS = 600  # after a provider failure, do not hit it again for 10 min (avoids IP-level blocking)
 HORIZONS_URL = "https://ssd.jpl.nasa.gov/api/horizons.api"
 GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
 SRC_CELESTRAK = "CelesTrak GP JSON"
@@ -195,6 +196,15 @@ app.add_middleware(CORSMiddleware, allow_origins=ALLOWED_ORIGINS, allow_credenti
 
 _rate: dict[str, list[float]] = {}
 _ai_day = {"day": "", "n": 0}
+_fail: dict[str, tuple[float, str]] = {}
+
+
+def why(exc: Exception) -> str:
+    if isinstance(exc, httpx.HTTPStatusError):
+        return f"HTTP {exc.response.status_code}"
+    if isinstance(exc, httpx.TimeoutException):
+        return "délai dépassé"
+    return (str(exc)[:120] or type(exc).__name__)
 
 
 def client_ip(request: Request) -> str:
@@ -275,6 +285,11 @@ async def celestrak(key: str, params: dict[str, str]) -> DataEnvelope:
     cached = await store.cache_get(key)
     if cached and time.time() - cached[1] < CACHE_TTL_SECONDS:
         return to_envelope(cached, stale=False)
+    backoff = _fail.get(key)
+    if backoff and time.time() < backoff[0]:
+        if cached:
+            return to_envelope(cached, stale=True)
+        raise HTTPException(status_code=502, detail=f"CelesTrak indisponible ({backoff[1]}) ; nouvelle tentative possible dans {round(backoff[0] - time.time())} s.")
     try:
         payload = await fetch_json(CELESTRAK_URL, params)
         if payload is None and "CATNR" in params:
@@ -283,12 +298,14 @@ async def celestrak(key: str, params: dict[str, str]) -> DataEnvelope:
             raise ValueError("Provider response was not a JSON array")
         wrapped = {"total": len(payload), "items": payload[:MAX_OBJECTS]}
         await store.cache_set(key, wrapped, SRC_CELESTRAK)
+        _fail.pop(key, None)
         return to_envelope(store._mem[key], stale=False)
     except (httpx.HTTPError, ValueError) as exc:
-        logger.warning("CelesTrak request failed (%s): %s", key, exc)
+        logger.warning("CelesTrak request failed (%s): %s", key, why(exc))
+        _fail[key] = (time.time() + FAIL_BACKOFF_SECONDS, why(exc))
         if cached:
             return to_envelope(cached, stale=True)
-        raise HTTPException(status_code=502, detail="Satellite data provider unavailable and no cache is available.") from exc
+        raise HTTPException(status_code=502, detail=f"CelesTrak indisponible ({why(exc)}) et aucun cache disponible.") from exc
 
 
 @app.get("/health", tags=["Operations"])
