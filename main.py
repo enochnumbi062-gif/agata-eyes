@@ -43,7 +43,7 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
 GEMINI_MODELS = [m.strip() for m in os.getenv(
     "GEMINI_MODELS", "gemini-3.5-flash,gemini-3.1-flash-lite,gemini-2.5-flash").split(",") if m.strip()]
 CACHE_TTL_SECONDS = env_int("CACHE_TTL_SECONDS", 7200, 300, 86400)
-HTTP_TIMEOUT_SECONDS = env_int("HTTP_TIMEOUT_SECONDS", 12, 3, 30)
+HTTP_TIMEOUT_SECONDS = env_int("HTTP_TIMEOUT_SECONDS", 20, 3, 30)
 MAX_REQUESTS_PER_MINUTE = env_int("MAX_REQUESTS_PER_MINUTE", 120, 30, 5000)
 AI_MAX_PER_MINUTE = env_int("AI_MAX_PER_MINUTE", 6, 1, 60)
 AI_DAILY_LIMIT = env_int("AI_DAILY_LIMIT", 300, 1, 100000)
@@ -202,8 +202,10 @@ _fail: dict[str, tuple[float, str]] = {}
 def why(exc: Exception) -> str:
     if isinstance(exc, httpx.HTTPStatusError):
         return f"HTTP {exc.response.status_code}"
+    if isinstance(exc, httpx.ConnectTimeout):
+        return "connexion expirée : adresse du serveur probablement filtrée"
     if isinstance(exc, httpx.TimeoutException):
-        return "délai dépassé"
+        return "réponse trop lente"
     return (str(exc)[:120] or type(exc).__name__)
 
 
@@ -242,7 +244,7 @@ async def request_guard(request: Request, call_next):
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=(self)"
     response.headers["Cache-Control"] = "no-store" if request.url.path.startswith("/api/") else "public, max-age=300"
     return response
 
@@ -265,7 +267,7 @@ class AIRequest(BaseModel):
 
 async def fetch_json(url: str, params: dict[str, str]) -> Any:
     headers = {"User-Agent": f"AgAtA-EyEs/{APP_VERSION} (public demo)"}
-    async with httpx.AsyncClient(timeout=HTTP_TIMEOUT_SECONDS, follow_redirects=True, headers=headers) as client:
+    async with httpx.AsyncClient(timeout=httpx.Timeout(HTTP_TIMEOUT_SECONDS, connect=8), follow_redirects=True, headers=headers) as client:
         response = await client.get(url, params=params)
         response.raise_for_status()
         try:
@@ -329,6 +331,7 @@ def status():
     return {
         "service": APP_NAME, "version": APP_VERSION, "timestamp": utc_now(),
         "database": "supabase" if store.enabled else "memory",
+        "supabase_env": {"url": bool(SUPABASE_URL), "key": bool(SUPABASE_KEY)},
         "ai": {"enabled": bool(GEMINI_API_KEY), "models": GEMINI_MODELS if GEMINI_API_KEY else [],
                "per_minute": AI_MAX_PER_MINUTE, "daily_limit": AI_DAILY_LIMIT},
         "providers": [
@@ -341,7 +344,8 @@ def status():
     }
 
 
-CELESTRAK_GROUPS = {"stations", "active", "visual", "weather", "gps-ops", "geo"}
+CELESTRAK_GROUPS = {"stations", "active", "visual", "weather", "gps-ops", "geo", "starlink", "oneweb", "galileo",
+                    "beidou", "glo-ops", "science", "amateur", "last-30-days"}
 
 
 @app.get("/api/v1/satellites", response_model=DataEnvelope, tags=["Satellite Catalog"])
