@@ -697,9 +697,7 @@ function addPlace(n,la,lo,k){
   NL.push({n,k,t:TIER[k],pos:Cesium.Cartesian3.fromDegrees(lo,la,5000),el:null,on:false,w:cx.measureText(n).width+n.length*z[2]+(k==="v"||k==="m"?12:8),h:z[0]*1.7});
 }
 function buildNames(){
-  cx=document.createElement("canvas").getContext("2d");
-  for(const row of PLACES.split("\n").filter(Boolean)){const[n,la,lo,k]=row.split(",");addPlace(n,+la,+lo,k)}
-  NL.sort((a,b)=>a.t-b.t);
+  if(!NL.length){cx=document.createElement("canvas").getContext("2d");for(const row of PLACES.split("\n").filter(Boolean)){const[n,la,lo,k]=row.split(",");addPlace(n,+la,+lo,k)}NL.sort((a,b)=>a.t-b.t)}
   const cam=viewer.camera;cam.percentageChanged=.01;cam.changed.addEventListener(()=>{dirty=true});
   cam.moveEnd.addEventListener(()=>{dirty=true;lastDec=0;viewer.scene.requestRender();clearTimeout(buildNames.t);buildNames.t=setTimeout(wantCells,500)});
   viewer.scene.postRender.addEventListener(()=>{
@@ -743,6 +741,7 @@ function placeLabels(){
 /* Détail local (villes, provinces) : OpenStreetMap via Overpass, par cases de 2°, mis en cache */
 const cells=new Map(),queue=[];let busy=false,warnedOv=false;
 function wantCells(){
+  if(!viewer)return;
   if(lbl.style.display==="none")return;
   const cam=viewer.camera;if(cam.positionCartographic.height>2.5e6)return;
   const r=cam.computeViewRectangle();if(!r)return;
@@ -765,7 +764,7 @@ async function pump(){
       const t=el.tags||{},n=t["name:fr"]||t.name;if(!n||known.has(n.toLowerCase()))continue;known.add(n.toLowerCase());
       addPlace(n,el.lat,el.lon,t.place==="city"?"v":t.place==="town"?"m":"p");
     }
-    NL.sort((a,b)=>a.t-b.t);cells.set(k,0);dirty=true;viewer.scene.requestRender();
+    NL.sort((a,b)=>a.t-b.t);cells.set(k,0);dirty=true;if(viewer)viewer.scene.requestRender();
   }catch(_){cells.set(k,Date.now()+60000);if(!warnedOv){warnedOv=true;toast("Noms détaillés indisponibles pour le moment.")}}
   busy=false;if(queue.length)setTimeout(pump,800);
 }
@@ -808,23 +807,43 @@ function watchFps(){
     else if(f>50&&viewer.resolutionScale<qTarget)viewer.resolutionScale=Math.min(qTarget,viewer.resolutionScale+.15);
   });
 }
+let rebuilds=[],glLost=false;
+function rebuildGlobe(){
+  const now=Date.now();rebuilds=rebuilds.filter(t=>now-t<20000);
+  if(rebuilds.length>=3){toast("Le rendu 3D a échoué plusieurs fois : rechargez la page.");return}
+  rebuilds.push(now);
+  let view=null;
+  try{const c=viewer.camera;view={destination:c.positionWC.clone(),orientation:{heading:c.heading,pitch:c.pitch,roll:c.roll}}}catch(_){}
+  try{viewer.destroy()}catch(_){}
+  viewer=null;pts=null;selEnt=null;traceEnt=null;selPos=undefined;glLost=false;
+  $("globe").replaceChildren();
+  initGlobe(view);
+  if(!viewer)return;
+  buildSats();
+  if(selected){const n=byItem.get(selected.it);if(n)selected=n;drawTrace()}
+  tick();
+}
 const homeView=()=>viewer&&viewer.camera.flyTo({destination:Cesium.Cartesian3.fromDegrees(12,14,23500000),duration:dur(1.3)});
-function initGlobe(){
+function initGlobe(view){
   if(!window.Cesium){toast("Bibliothèque 3D indisponible : vérifiez la connexion.");return}
   try{
-    viewer=new Cesium.Viewer("globe",{animation:false,timeline:false,baseLayerPicker:false,geocoder:false,homeButton:false,sceneModePicker:false,navigationHelpButton:false,fullscreenButton:false,infoBox:false,selectionIndicator:false,baseLayer:false,shouldAnimate:false,requestRenderMode:true,maximumRenderTimeChange:Infinity,terrainProvider:new Cesium.EllipsoidTerrainProvider()});
+    viewer=new Cesium.Viewer("globe",{animation:false,timeline:false,baseLayerPicker:false,geocoder:false,homeButton:false,sceneModePicker:false,navigationHelpButton:false,fullscreenButton:false,infoBox:false,selectionIndicator:false,baseLayer:false,shouldAnimate:false,requestRenderMode:true,maximumRenderTimeChange:Infinity,showRenderLoopErrors:false,terrainProvider:new Cesium.EllipsoidTerrainProvider()});
     $("imgDate").value=$("imgDate").max=dayAgo(1);
     try{const qv=localStorage.getItem("agata-eyes.q");if(qv&&"012".includes(qv))$("qual").value=qv}catch(_){}
     setBase();
     const sc=viewer.scene;
-    sc.globe.enableLighting=$("light").checked;sc.globe.showGroundAtmosphere=true;sc.globe.showWaterEffect=true;applyQuality();watchFps();setTimeout(()=>{buildNames();applyNames()},1200);sc.globe.baseColor=Cesium.Color.fromCssColorString("#0a1424");
+    sc.globe.enableLighting=$("light").checked;sc.globe.showGroundAtmosphere=true;sc.globe.showWaterEffect=true;applyQuality();watchFps();setTimeout(()=>{buildNames();applyNames()},NL.length?0:1200);sc.globe.baseColor=Cesium.Color.fromCssColorString("#0a1424");
     sc.backgroundColor=Cesium.Color.fromCssColorString("#0a0e17");
     sc.screenSpaceCameraController.minimumZoomDistance=500000;sc.screenSpaceCameraController.maximumZoomDistance=60000000;
-    viewer.camera.setView({destination:Cesium.Cartesian3.fromDegrees(12,14,23500000)});
+    viewer.camera.setView(view||{destination:Cesium.Cartesian3.fromDegrees(12,14,23500000)});
     pts=sc.primitives.add(new Cesium.PointPrimitiveCollection());
     selEnt=viewer.entities.add({position:new Cesium.CallbackProperty(()=>selPos,false),show:false,
       point:{pixelSize:11,color:Cesium.Color.fromCssColorString("#f5b942"),outlineColor:Cesium.Color.BLACK,outlineWidth:1},
       label:{text:"",font:"13px system-ui",showBackground:true,backgroundColor:Cesium.Color.fromCssColorString("#0a0e17").withAlpha(.8),fillColor:Cesium.Color.WHITE,pixelOffset:new Cesium.Cartesian2(0,-20)}});
+    const cv=sc.canvas;
+    cv.addEventListener("webglcontextlost",e=>{e.preventDefault();glLost=true;viewer.useDefaultRenderLoop=false});
+    cv.addEventListener("webglcontextrestored",()=>{if(glLost)rebuildGlobe()});
+    sc.renderError.addEventListener(()=>{glLost=true;setTimeout(rebuildGlobe,0)});
     viewer.screenSpaceEventHandler.setInputAction(c=>{const p=viewer.scene.pick(c.position);if(p&&p.id&&p.id.rec)selectObject(p.id)},Cesium.ScreenSpaceEventType.LEFT_CLICK);
   }catch(e){console.error(e);toast("Échec de l'initialisation du globe.")}
 }
@@ -1015,7 +1034,11 @@ $("oCenter").onclick=()=>live?flyToSel():toast("Sélectionnez d'abord un objet."
 $("oAi").onclick=()=>selected?ask("Résume l'orbite de cet objet et précise la fiabilité de ses éléments."):toast("Sélectionnez d'abord un objet.");
 $("oApi").onclick=()=>{const id=selected&&selected.it.NORAD_CAT_ID;id?window.open("/api/v1/satellites/"+encodeURIComponent(id),"_blank","noopener,noreferrer"):toast("Aucun numéro NORAD pour cet objet.")};
 
-document.addEventListener("visibilitychange",()=>{if(!document.hidden&&viewer){dirty=true;viewer.scene.requestRender()}});
+document.addEventListener("visibilitychange",()=>{
+  if(document.hidden||!viewer)return;
+  let lost=glLost;try{const gl=viewer.scene.context._gl;lost=lost||!!(gl&&gl.isContextLost&&gl.isContextLost())}catch(_){}
+  if(lost)rebuildGlobe();else{dirty=true;viewer.scene.requestRender()}
+});
 initGlobe();
 if(!SGP4)toast("Propagation SGP4 indisponible : le catalogue s'affiche sans positions.");
 setInterval(tick,1000);
