@@ -82,6 +82,7 @@ textarea.in{resize:none}h3{margin:0;font-size:16px}
     <div id="oRows"></div>
     <label class="chk"><input type="checkbox" id="trace" checked> Tracer la trajectoire sur une période</label>
     <div class="row"><button id="oCenter" class="bt" type="button">Centrer</button><button id="oAi" class="bt" type="button">Demander à l'IA</button><button id="oApi" class="bt" type="button">Fiche API</button></div>
+    <button id="oObs" class="bt" type="button">Mon point d'observation</button>
     <p class="note">Positions calculées par SGP4 à partir des éléments CelesTrak : la précision diminue avec l'âge des éléments.</p>
   </div>
 </section>
@@ -96,7 +97,10 @@ textarea.in{resize:none}h3{margin:0;font-size:16px}
 
 <section class="pal hid" data-id="view" data-title="Vue et temps" style="width:290px">
   <div class="pb">
-    <label class="f">Fond de carte<select id="base" class="in"><option value="nasa">NASA Blue Marble</option><option value="osm">OpenStreetMap</option></select></label>
+    <label class="f">Fond de carte<select id="base" class="in"><option value="viirs">NASA · Terre du jour (VIIRS)</option><option value="bm">NASA · Blue Marble</option><option value="night">NASA · Terre la nuit</option><option value="osm">OpenStreetMap</option><option value="dark">Sombre (CARTO)</option></select></label>
+    <label class="f" id="dateBox">Date de l'imagerie<input type="date" id="imgDate" class="in"></label>
+    <label class="chk"><input type="checkbox" id="ref" checked> Frontières et noms (fonds NASA)</label>
+    <label class="chk"><input type="checkbox" id="light" checked> Éclairage jour/nuit</label>
     <label class="chk"><input type="checkbox" id="showPts" checked> Afficher les satellites</label>
     <label class="chk"><input type="checkbox" id="showLbl" checked> Étiquette de l'objet sélectionné</label>
     <label class="f">Vitesse du temps<select id="spd" class="in"><option value="1">Temps réel</option><option value="60">×60</option><option value="600">×600</option></select></label>
@@ -144,6 +148,7 @@ const clamp=(v,a,b)=>Math.min(Math.max(v,a),Math.max(a,b));
 const num=(v,d=2,u="")=>{const n=Number(v);return Number.isFinite(n)?n.toFixed(d)+u:"—"};
 const mobile=()=>matchMedia("(max-width:700px)").matches;
 const ago=iso=>{if(!iso)return"—";const s=Math.max(0,Math.round((Date.now()-new Date(iso))/1000));return s<60?s+" s":s<3600?Math.floor(s/60)+" min":Math.floor(s/3600)+" h"};
+const dayAgo=n=>new Date(Date.now()-n*864e5).toISOString().slice(0,10);
 const epochMs=e=>Date.parse(/[zZ]|[+-]\d\d:?\d\d$/.test(e)?e:e+"Z");
 function toast(m){const e=$("toast");e.textContent=m;clearTimeout(toast.t);toast.t=setTimeout(()=>{e.textContent=""},3500)}
 async function api(path,o={}){
@@ -154,7 +159,7 @@ async function api(path,o={}){
 }
 function kvRows(box,defs,out){for(const[k,l]of defs){const r=h("div","kv"),v=h("b","","—");r.append(h("span","",l),v);box.append(r);out[k]=v}}
 function setPill(id,t,c){const e=$(id);e.textContent=t;e.className="pill "+(c||"")}
-function setConn(ok,t){$("dot").className="dot "+(ok?"ok":"w");$("conn").textContent=t;$("tApi").textContent=ok?"En ligne":"Dégradé";$("tApi").style.color=ok?"var(--ok)":"var(--ac)"}
+function setConn(ok,t,a){$("dot").className="dot "+(ok?"ok":"w");$("conn").textContent=t;$("tApi").textContent=a||(ok?"En ligne":"Dégradé");$("tApi").style.color=ok?"var(--ok)":"var(--ac)"}
 
 /* ---------- Palettes flottantes ---------- */
 const KEY="agata-eyes.palettes.v1";
@@ -201,36 +206,47 @@ addEventListener("keydown",e=>{
 });
 
 /* ---------- Construction des palettes ---------- */
-const GROUPS=[["stations","Stations spatiales"],["active","Objets actifs"],["visual","Visibles à l'œil nu"],["weather","Météo"],["gps-ops","GPS opérationnels"],["geo","Géostationnaires"]];
+const GROUPS=[["stations","Stations spatiales"],["active","Objets actifs"],["visual","Visibles à l'œil nu"],["weather","Météo"],["gps-ops","GPS opérationnels"],["geo","Géostationnaires"],["starlink","Starlink"],["oneweb","OneWeb"],["galileo","Galileo (UE)"],["beidou","BeiDou (Chine)"],["glo-ops","GLONASS"],["science","Science"],["amateur","Radioamateurs"],["last-30-days","Lancés ces 30 derniers jours"]];
 const TARGETS=[["sun","Soleil"],["mercury","Mercure"],["venus","Vénus"],["earth","Terre"],["moon","Lune"],["mars","Mars"],["jupiter","Jupiter"],["saturn","Saturne"],["uranus","Uranus"],["neptune","Neptune"]];
 for(const[v,l]of GROUPS){const o=h("option","",l);o.value=v;$("grp").append(o)}
 for(const[v,l]of TARGETS){const o=h("option","",l);o.value=v;$("eT").append(o)}
 $("eT").value="earth";
 const ov={},ev={};
-kvRows($("oRows"),[["n","NORAD"],["ep","Époque des éléments"],["age","Âge des éléments"],["per","Période"],["inc","Inclinaison"],["ecc","Excentricité"],["alt","Altitude"],["lat","Latitude"],["lon","Longitude"],["spd","Vitesse"]],ov);
+kvRows($("oRows"),[["n","NORAD"],["ep","Époque des éléments"],["age","Âge des éléments"],["per","Période"],["inc","Inclinaison"],["ecc","Excentricité"],["alt","Altitude"],["lat","Latitude"],["lon","Longitude"],["spd","Vitesse"],["ele","Élévation"],["az","Azimut"],["rng","Distance"]],ov);
 kvRows($("eRows"),[["t","Cible"],["d","Date (TDB)"],["x","X"],["y","Y"],["z","Z"],["v","Vitesse"],["r","Distance au barycentre"],["s","Source"]],ev);
 
 /* ---------- État ---------- */
-let viewer,pts,selEnt,traceEnt,selPos,live=null,eage=null,ephRow=null;
+let viewer,pts,selEnt,traceEnt,selPos,live=null,eage=null,ephRow=null,obs=null;
 let catalogue=[],sats=[],byItem=new Map(),selected=null,curGroup="stations",total=0,stale=false;
 let simMs=Date.now(),speed=1,lastTs=performance.now(),lastDigest="",lastFetch=null,showLabel=true;
 const SGP4=!!(window.satellite&&satellite.json2satrec);
 
 /* ---------- Globe ---------- */
-function setBase(kind){
-  viewer.imageryLayers.removeAll();
-  viewer.imageryLayers.addImageryProvider(new Cesium.UrlTemplateImageryProvider(kind==="osm"
-    ?{url:"https://tile.openstreetmap.org/{z}/{x}/{y}.png",credit:"© OpenStreetMap contributors",maximumLevel:19}
-    :{url:"https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/BlueMarble_ShadedRelief_Bathymetry/default/GoogleMapsCompatible_Level8/{z}/{y}/{x}.jpeg",credit:"Imagery © NASA GIBS / Blue Marble",maximumLevel:8}));
+const GIBS="https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/";
+const gibs=(l,t,ext,lv)=>new Cesium.UrlTemplateImageryProvider({url:GIBS+l+"/default/"+t+"/GoogleMapsCompatible_Level"+lv+"/{z}/{y}/{x}."+ext,maximumLevel:lv,credit:"Imagery © NASA EOSDIS GIBS"});
+const carto=(st,cr)=>new Cesium.UrlTemplateImageryProvider({url:"https://{s}.basemaps.cartocdn.com/"+st+"/{z}/{x}/{y}@2x.png",subdomains:"abcd",tileWidth:512,tileHeight:512,maximumLevel:18,credit:cr||"© OpenStreetMap contributors © CARTO"});
+function setBase(){
+  const k=$("base").value,nasa=k==="viirs"||k==="bm"||k==="night";
+  $("dateBox").style.display=k==="viirs"?"":"none";
+  const L=viewer.imageryLayers;L.removeAll();
+  const p=k==="viirs"?gibs("VIIRS_SNPP_CorrectedReflectance_TrueColor",$("imgDate").value||dayAgo(1),"jpg",9)
+    :k==="bm"?gibs("BlueMarble_ShadedRelief_Bathymetry","default","jpeg",8)
+    :k==="night"?gibs("VIIRS_Black_Marble","default","png",8)
+    :k==="dark"?carto("dark_all"):new Cesium.UrlTemplateImageryProvider({url:"https://tile.openstreetmap.org/{z}/{x}/{y}.png",maximumLevel:19,credit:"© OpenStreetMap contributors"});
+  let warned=false;p.errorEvent.addEventListener(()=>{if(!warned){warned=true;toast("Certaines tuiles du fond de carte sont indisponibles (essayez une autre date ou un autre fond).")}});
+  L.addImageryProvider(p);
+  if(nasa&&$("ref").checked){L.addImageryProvider(gibs("Reference_Features_15m","default","png",13));L.addImageryProvider(carto("dark_only_labels"))}
 }
 const homeView=()=>viewer&&viewer.camera.flyTo({destination:Cesium.Cartesian3.fromDegrees(12,14,23500000),duration:1.3});
 function initGlobe(){
   if(!window.Cesium){toast("Bibliothèque 3D indisponible : vérifiez la connexion.");return}
   try{
     viewer=new Cesium.Viewer("globe",{animation:false,timeline:false,baseLayerPicker:false,geocoder:false,homeButton:false,sceneModePicker:false,navigationHelpButton:false,fullscreenButton:false,infoBox:false,selectionIndicator:false,baseLayer:false,shouldAnimate:false,terrainProvider:new Cesium.EllipsoidTerrainProvider()});
-    setBase("nasa");
+    $("imgDate").value=$("imgDate").max=dayAgo(1);
+    viewer.useBrowserRecommendedResolution=false;viewer.resolutionScale=Math.min(window.devicePixelRatio||1,2);
+    setBase();
     const sc=viewer.scene;
-    sc.globe.enableLighting=true;sc.globe.baseColor=Cesium.Color.fromCssColorString("#0a1424");
+    sc.globe.enableLighting=$("light").checked;sc.globe.maximumScreenSpaceError=1.5;sc.globe.baseColor=Cesium.Color.fromCssColorString("#0a1424");
     sc.backgroundColor=Cesium.Color.fromCssColorString("#0a0e17");
     sc.screenSpaceCameraController.minimumZoomDistance=500000;sc.screenSpaceCameraController.maximumZoomDistance=60000000;
     viewer.camera.setView({destination:Cesium.Cartesian3.fromDegrees(12,14,23500000)});
@@ -257,6 +273,7 @@ function updateSelected(d,g){
   if(!pv||typeof pv.position!=="object"||!pv.velocity){live=null;selPos=undefined;selEnt.show=false;ov.alt.textContent=ov.lat.textContent=ov.lon.textContent=ov.spd.textContent="indisponible";return}
   const geo=satellite.eciToGeodetic(pv.position,g),e=satellite.eciToEcf(pv.position,g),v=pv.velocity;
   live={lat:satellite.degreesLat(geo.latitude),lon:satellite.degreesLong(geo.longitude),alt:geo.height,spd:Math.hypot(v.x,v.y,v.z)};
+  if(obs){const la=satellite.ecfToLookAngles(obs,e);live.ele=la.elevation*180/Math.PI;live.az=((la.azimuth*180/Math.PI)%360+360)%360;live.rng=la.rangeSat;ov.ele.textContent=num(live.ele,1,"°")+(live.ele>0?" · au-dessus de l'horizon":"");ov.az.textContent=num(live.az,1,"°");ov.rng.textContent=num(live.rng,0," km")}
   selPos=new Cesium.Cartesian3(e.x*1e3,e.y*1e3,e.z*1e3);selEnt.show=true;selEnt.label.show=showLabel;
   ov.lat.textContent=num(live.lat,3,"°");ov.lon.textContent=num(live.lon,3,"°");ov.alt.textContent=num(live.alt,1," km");ov.spd.textContent=num(live.spd,2," km/s");
 }
@@ -303,26 +320,33 @@ function renderList(){
     b.onclick=()=>selectObject(byItem.get(it)||{it});return b;
   }));
 }
+const dkey=g=>"agata-eyes.gp."+g;
+function directCache(g){try{const c=JSON.parse(localStorage.getItem(dkey(g))||"null");if(c&&Date.now()-c.t<72e5)return c.r}catch(_){}return null}
 async function direct(group){
   const r=await fetch("https://celestrak.org/NORAD/elements/gp.php?GROUP="+encodeURIComponent(group)+"&FORMAT=JSON");
   if(!r.ok)throw new Error("HTTP "+r.status);
-  const a=await r.json();if(!Array.isArray(a))throw new Error("réponse invalide");
-  return{data:a.slice(0,3000),total:a.length,stale:false,sha256:"",fetched_at:new Date().toISOString(),direct:true};
+  const txt=await r.text();let a;try{a=JSON.parse(txt)}catch(_){throw new Error("réponse invalide")}
+  if(!Array.isArray(a))throw new Error("réponse invalide");
+  const sha=[...new Uint8Array(await crypto.subtle.digest("SHA-256",new TextEncoder().encode(txt)))].map(b=>b.toString(16).padStart(2,"0")).join("");
+  const out={data:a.slice(0,3000),total:a.length,stale:false,sha256:sha,fetched_at:new Date().toISOString(),direct:true};
+  try{localStorage.setItem(dkey(group),JSON.stringify({t:Date.now(),r:out}))}catch(_){}
+  return out;
 }
 async function loadCatalogue(group){
   curGroup=group||curGroup;$("load").disabled=true;
   $("list").replaceChildren(h("div","empty","Chargement du catalogue…"));
   const t0=performance.now();
   try{
-    let r;try{r=await api("/api/v1/satellites?group="+encodeURIComponent(curGroup))}catch(err){try{r=await direct(curGroup);toast("Le serveur n'accède pas à CelesTrak : chargement direct depuis votre navigateur.")}catch(_){throw err}}
+    let r=directCache(curGroup);if(!r)try{r=await api("/api/v1/satellites?group="+encodeURIComponent(curGroup))}catch(err){try{r=await direct(curGroup);toast("Le serveur n'accède pas à CelesTrak : chargement direct depuis votre navigateur.")}catch(_){throw err}}
     catalogue=Array.isArray(r.data)?r.data:[];total=r.total||catalogue.length;stale=!!r.stale;
     lastDigest=r.sha256||"";lastFetch=r.fetched_at;selected=null;selEnt&&(selEnt.show=false);drawTrace();
     buildSats();renderList();tick();
+    if(pending){const f=sats.find(x=>String(x.it.NORAD_CAT_ID)===pending);pending=null;if(f)selectObject(f)}
     $("tCount").textContent=catalogue.length.toLocaleString("fr-FR");
     $("tInt").textContent=lastDigest?"Vérifiée*":"—";$("tDig").textContent=lastDigest?lastDigest.slice(0,16)+"…":"—";
     $("catNote").textContent=(total>catalogue.length?`${catalogue.length.toLocaleString("fr-FR")} objets affichés sur ${total.toLocaleString("fr-FR")}. `:"")+(SGP4?"":"Propagation SGP4 indisponible. ")+`Réponse en ${Math.round(performance.now()-t0)} ms.`;
     setPill("pCt",r.direct?"Direct navigateur":stale?"Cache périmé":"Connecté",r.direct||stale?"w":"");
-    setConn(!stale&&!r.direct,r.direct?"Mode direct navigateur":stale?"Données en cache":"Liaison opérationnelle");
+    setConn(!stale&&!r.direct,r.direct?"Mode direct navigateur":stale?"Données en cache":"Liaison opérationnelle",r.direct?"Mode direct":"");
   }catch(e){
     $("list").replaceChildren(h("div","empty","Catalogue indisponible : "+e.message));$("catNote").textContent="Échec du chargement.";
     setPill("pCt","Indisponible","b");setConn(false,"Liaison dégradée");toast("Catalogue : "+e.message);
@@ -334,7 +358,7 @@ function selectObject(s){
   ov.n.textContent=it.NORAD_CAT_ID??"—";ov.ep.textContent=it.EPOCH?String(it.EPOCH).replace("T"," ").slice(0,19)+" UTC":"—";
   ov.per.textContent=num(1440/Number(it.MEAN_MOTION),1," min");ov.inc.textContent=num(it.INCLINATION,2,"°");ov.ecc.textContent=num(it.ECCENTRICITY,5);
   if(selEnt)selEnt.label.text=it.OBJECT_NAME||"";
-  live=null;renderList();setOpen("obj",true);
+  live=null;renderList();setOpen("obj",true);try{history.replaceState(null,"","#"+curGroup+"/"+(it.NORAD_CAT_ID||""))}catch(_){}
   if(SGP4&&s.rec){tick();drawTrace();flyToSel()}else toast("Positions indisponibles pour cet objet.");
 }
 
@@ -382,7 +406,7 @@ $("aiQ").addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preve
 async function loadStatus(){
   try{
     const s=await api("/api/v1/status");
-    setPill("pDb",s.database==="supabase"?"Supabase":"Mémoire (non durable)",s.database==="supabase"?"":"w");
+    setPill("pDb",s.database==="supabase"?"Supabase":"Mémoire · "+(!s.supabase_env.url?"SUPABASE_URL absente":"SUPABASE_SERVICE_KEY absente"),s.database==="supabase"?"":"w");
     setPill("pAi",s.ai.enabled?"Gemini actif":"Non configuré",s.ai.enabled?"":"w");
   }catch(_){setPill("pDb","Injoignable","b");setPill("pAi","Inconnu","w")}
 }
@@ -399,7 +423,9 @@ $("q").addEventListener("input",renderList);
 $("eGo").onclick=loadEph;
 $("aRef").onclick=()=>{loadStatus();loadAudit()};
 $("aDoc").onclick=()=>window.open("/docs","_blank","noopener,noreferrer");
-$("base").onchange=e=>viewer&&setBase(e.target.value);
+$("base").onchange=$("imgDate").onchange=$("ref").onchange=()=>viewer&&setBase();
+$("light").onchange=e=>{if(viewer)viewer.scene.globe.enableLighting=e.target.checked};
+$("oObs").onclick=()=>{if(!navigator.geolocation)return toast("Géolocalisation indisponible.");navigator.geolocation.getCurrentPosition(q=>{obs={latitude:q.coords.latitude*Math.PI/180,longitude:q.coords.longitude*Math.PI/180,height:(q.coords.altitude||0)/1e3};toast("Point d'observation enregistré (il reste dans votre navigateur).")},()=>toast("Position refusée ou indisponible."),{timeout:10000})};
 $("spd").onchange=e=>{speed=Number(e.target.value)};
 $("showLbl").onchange=e=>{showLabel=e.target.checked};
 $("trace").onchange=drawTrace;
@@ -413,7 +439,9 @@ $("oApi").onclick=()=>{const id=selected&&selected.it.NORAD_CAT_ID;id?window.ope
 initGlobe();
 if(!SGP4)toast("Propagation SGP4 indisponible : le catalogue s'affiche sans positions.");
 setInterval(tick,1000);
-loadCatalogue("stations");loadStatus();loadAudit();
+const hs=location.hash.slice(1).split("/");let pending=hs[1]||null;
+if(GROUPS.some(g=>g[0]===hs[0])){curGroup=hs[0];$("grp").value=hs[0]}
+loadCatalogue(curGroup);loadStatus();loadAudit();
 })();
 </script>
 </body>
