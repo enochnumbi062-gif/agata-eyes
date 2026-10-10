@@ -418,19 +418,43 @@ Malte,35.9,14.4,3
 Andorre,42.5,1.6,3
 Maldives,3.2,73.2,3`;
 let names=null;
+let NL=[],dirty=true,lastDec=0;
 function buildNames(){
   names=viewer.scene.primitives.add(new Cesium.LabelCollection());
-  const R={c:[18e6,1e9,19,"700"],o:[18e6,1e9,14,"italic 500"],1:[0,19e6,14,"600"],2:[0,9e6,12,"600"],3:[0,5e6,11,"500"]};
+  const R={c:[19,"700",0],o:[14,"italic 500",0],1:[14,"600",1],2:[12,"600",2],3:[11,"500",3]},cx=document.createElement("canvas").getContext("2d");
   for(const row of PLACES.split("\n").filter(Boolean)){
     const[n,la,lo,k]=row.split(","),r=R[k];if(!r)continue;
-    names.add({text:n,position:Cesium.Cartesian3.fromDegrees(+lo,+la,8000),font:r[3]+" "+r[2]+"px system-ui,sans-serif",
-      fillColor:k==="o"?Cesium.Color.fromCssColorString("#9fd0ff"):Cesium.Color.WHITE,outlineColor:Cesium.Color.fromCssColorString("#0a0e17"),outlineWidth:3,
-      style:Cesium.LabelStyle.FILL_AND_OUTLINE,horizontalOrigin:Cesium.HorizontalOrigin.CENTER,verticalOrigin:Cesium.VerticalOrigin.CENTER,
-      distanceDisplayCondition:new Cesium.DistanceDisplayCondition(r[0],r[1])});
+    const font=r[1]+" "+r[0]+"px system-ui,sans-serif",pos=Cesium.Cartesian3.fromDegrees(+lo,+la,8000);cx.font=font;
+    const l=names.add({text:n,position:pos,font,show:false,fillColor:k==="o"?Cesium.Color.fromCssColorString("#9fd0ff"):Cesium.Color.WHITE,
+      outlineColor:Cesium.Color.fromCssColorString("#0a0e17"),outlineWidth:3,style:Cesium.LabelStyle.FILL_AND_OUTLINE,
+      horizontalOrigin:Cesium.HorizontalOrigin.CENTER,verticalOrigin:Cesium.VerticalOrigin.CENTER});
+    NL.push({l,pos,k,t:r[2],w:cx.measureText(n).width+12,h:r[0]*1.6});
   }
+  NL.sort((a,b)=>a.t-b.t);
+  const cam=viewer.camera;cam.percentageChanged=.01;cam.changed.addEventListener(()=>{dirty=true});
+  cam.moveEnd.addEventListener(()=>{dirty=true;lastDec=0;viewer.scene.requestRender()});
+  viewer.scene.postRender.addEventListener(()=>{const n=performance.now();if(dirty&&n-lastDec>100){dirty=false;lastDec=n;declutter()}});
+  dirty=true;
+}
+function declutter(){
+  if(!names||!names.show)return;
+  const sc=viewer.scene,cam=viewer.camera,h=cam.positionCartographic.height,occ=new Cesium.EllipsoidalOccluder(Cesium.Ellipsoid.WGS84,cam.positionWC);
+  const W=sc.canvas.clientWidth,H=sc.canvas.clientHeight,boxes=[];let changed=false;
+  for(const it of NL){
+    let on=it.t===0?h>(it.k==="o"?5e6:9e6):h<(it.t===1?22e6:it.t===2?8e6:4e6);
+    if(on){
+      const p=occ.isPointVisible(it.pos)?Cesium.SceneTransforms.worldToWindowCoordinates(sc,it.pos):null;
+      if(p&&p.x>-40&&p.x<W+40&&p.y>-20&&p.y<H+20){
+        const x0=p.x-it.w/2,y0=p.y-it.h/2,x1=x0+it.w,y1=y0+it.h;
+        if(boxes.some(b=>x0<b[2]&&x1>b[0]&&y0<b[3]&&y1>b[1]))on=false;else boxes.push([x0,y0,x1,y1]);
+      }else on=false;
+    }
+    if(it.l.show!==on){it.l.show=on;changed=true}
+  }
+  if(changed)sc.requestRender();
 }
 const isNasa=()=>["viirs","bm","night"].includes($("base").value);
-function applyNames(){if(names)names.show=$("nm").checked&&isNasa();if(viewer)viewer.scene.requestRender()}
+function applyNames(){if(names)names.show=$("nm").checked&&isNasa();dirty=true;if(viewer)viewer.scene.requestRender()}
 function setBase(){
   const k=$("base").value,nasa=isNasa();
   $("dateBox").style.display=k==="viirs"?"":"none";
@@ -440,11 +464,13 @@ function setBase(){
     :k==="night"?gibs("VIIRS_Black_Marble","default","png",8)
     :new Cesium.UrlTemplateImageryProvider({url:"https://tile.openstreetmap.org/{z}/{x}/{y}.png",maximumLevel:19,credit:"© OpenStreetMap contributors"});
   let warned=false;p.errorEvent.addEventListener(()=>{if(!warned){warned=true;toast("Certaines tuiles du fond de carte sont indisponibles (essayez une autre date ou un autre fond).")}});
-  L.addImageryProvider(p);
+  if(k==="viirs")L.addImageryProvider(gibs("BlueMarble_ShadedRelief_Bathymetry","default","jpeg",8));
+  const top=L.addImageryProvider(p);
+  if(k==="viirs"){top.colorToAlpha=Cesium.Color.BLACK;top.colorToAlphaThreshold=.03}
   if(nasa&&$("ref").checked)L.addImageryProvider(gibs("Reference_Features_15m","default","png",13,8));
   applyNames();
 }
-const QL=[[.75,3],[1,2],[Math.min(window.devicePixelRatio||1,1.5),1.5]];let qTarget=1;
+const QL=[[.75,3],[1,2],[1.5,1.75]];let qTarget=1;
 function applyQuality(){const i=Number($("qual").value),[a,b]=QL[Number.isInteger(i)&&QL[i]?i:1];qTarget=a;viewer.resolutionScale=a;viewer.scene.globe.maximumScreenSpaceError=b;viewer.scene.requestRender()}
 function watchFps(){
   let n=0,t=performance.now(),moved=false;
@@ -464,7 +490,7 @@ function initGlobe(){
   try{
     viewer=new Cesium.Viewer("globe",{animation:false,timeline:false,baseLayerPicker:false,geocoder:false,homeButton:false,sceneModePicker:false,navigationHelpButton:false,fullscreenButton:false,infoBox:false,selectionIndicator:false,baseLayer:false,shouldAnimate:false,requestRenderMode:true,maximumRenderTimeChange:Infinity,terrainProvider:new Cesium.EllipsoidTerrainProvider()});
     $("imgDate").value=$("imgDate").max=dayAgo(1);
-    viewer.useBrowserRecommendedResolution=false;try{const qv=localStorage.getItem("agata-eyes.q");if(qv&&"012".includes(qv))$("qual").value=qv}catch(_){}
+    try{const qv=localStorage.getItem("agata-eyes.q");if(qv&&"012".includes(qv))$("qual").value=qv}catch(_){}
     setBase();
     const sc=viewer.scene;
     sc.globe.enableLighting=$("light").checked;sc.msaaSamples=1;applyQuality();watchFps();setTimeout(()=>{buildNames();applyNames()},1200);sc.globe.baseColor=Cesium.Color.fromCssColorString("#0a1424");
