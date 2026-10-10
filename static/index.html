@@ -47,11 +47,19 @@ label.f{display:flex;flex-direction:column;gap:4px;color:var(--mu)}
 .chips{display:flex;flex-wrap:wrap;gap:6px}.chip{border:1px solid var(--line);border-radius:99px;background:none;padding:4px 10px;cursor:pointer;color:var(--mu)}.chip:hover{color:var(--ac);border-color:var(--ac)}
 textarea.in{resize:none}h3{margin:0;font-size:16px}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:90;background:#131c30;border:1px solid var(--line);border-radius:10px;padding:9px 14px;max-width:90vw}.toast:empty{display:none}
-@media(max-width:700px){.dock{top:auto;bottom:10px;left:50%;transform:translateX(-50%);flex-direction:row}.pal{left:8px!important;right:8px;top:auto!important;bottom:68px;width:auto!important;height:auto!important;max-height:58vh;resize:none}.brand span{display:none}.toast{bottom:76px}}
+#lbl{position:fixed;inset:0;z-index:5;pointer-events:none;overflow:hidden}
+.lb{position:absolute;left:0;top:0;white-space:nowrap;color:#fff;text-shadow:0 0 3px #000,0 0 5px #000,0 1px 2px #000;will-change:transform}
+.lbc{font:700 19px system-ui,sans-serif;letter-spacing:.06em}.lbo{font:italic 500 14px system-ui,sans-serif;color:#9fd0ff}
+.lb1{font:600 15px system-ui,sans-serif;letter-spacing:.04em}.lb2,.lbv{font:600 13px system-ui,sans-serif}.lb3,.lbm{font:500 12px system-ui,sans-serif}
+.lbv::before,.lbm::before{content:"";display:inline-block;width:6px;height:6px;margin-right:5px;border-radius:50%;background:#fff;box-shadow:0 0 3px #000;vertical-align:middle}
+.lbp{font:italic 500 11px system-ui,sans-serif;color:#d4e4f7;letter-spacing:.05em}
+@media(max-width:700px){.dock{top:auto;bottom:10px;left:50%;transform:translateX(-50%);flex-direction:row}.pal{left:8px!important;right:8px;top:auto!important;bottom:68px;width:auto!important;height:auto!important;max-height:58vh;resize:none}.brand span{display:none}.cesium-viewer-bottom{bottom:64px!important}.toast{bottom:76px}}
 </style>
 </head>
 <body>
+<noscript style="position:fixed;inset:0;display:grid;place-items:center;color:#e8eefc;font:16px system-ui">JavaScript est requis pour afficher AgAtA-EyEs.</noscript>
 <div id="globe" aria-label="Globe 3D interactif"></div>
+<div id="lbl" aria-hidden="true"></div>
 
 <button class="brand" id="brand" type="button" title="Afficher ou masquer les palettes (H)">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3.2" fill="currentColor"/></svg>
@@ -97,19 +105,17 @@ textarea.in{resize:none}h3{margin:0;font-size:16px}
 
 <section class="pal hid" data-id="view" data-title="Vue et temps" style="width:290px">
   <div class="pb">
-    <label class="f">Fond de carte
-      <select id="base" class="in">
-        <option value="voyager">Carto Voyager · Pays et régions</option>
+    <label class="f">Fond de carte<select id="base" class="in">
+        <option value="voyager">Carto Voyager · Pays et régions (clé gratuite)</option>
         <option value="osm">OpenStreetMap · Carte détaillée</option>
         <option value="viirs" selected>NASA · Terre du jour (VIIRS)</option>
         <option value="bm">NASA · Blue Marble</option>
         <option value="night">NASA · Terre la nuit</option>
-      </select>
-    </label>
+      </select></label>
     <label class="f" id="dateBox">Date de l'imagerie<input type="date" id="imgDate" class="in"></label>
     <label class="chk"><input type="checkbox" id="ref" checked> Frontières (fonds NASA)</label>
-    <label class="chk"><input type="checkbox" id="nm" checked> Noms des pays et continents (fonds NASA)</label>
-    <label class="chk"><input type="checkbox" id="light" checked> Éclairage jour/nuit</label>
+    <label class="chk"><input type="checkbox" id="nm" checked> Noms des lieux (fonds NASA)</label>
+    <label class="chk"><input type="checkbox" id="light" checked> Éclairage jour/nuit (lumières des villes la nuit)</label>
     <label class="f">Qualité d'affichage<select id="qual" class="in"><option value="0">Fluide</option><option value="1" selected>Équilibrée</option><option value="2">Nette</option></select></label>
     <label class="chk"><input type="checkbox" id="showPts" checked> Afficher les satellites</label>
     <label class="chk"><input type="checkbox" id="showLbl" checked> Étiquette de l'objet sélectionné</label>
@@ -145,7 +151,7 @@ textarea.in{resize:none}h3{margin:0;font-size:16px}
     <div class="kv"><span>Empreinte SHA-256</span><b id="tDig">—</b></div>
     <div class="row"><button id="aRef" class="bt" type="button">Actualiser le journal</button><button id="aDoc" class="bt" type="button">Documentation API</button></div>
     <div id="audit"></div>
-    <p class="note">Données : CelesTrak, NASA/JPL Horizons, NASA GIBS, OpenStreetMap. Démonstrateur : ne pas utiliser pour l'évitement de collision.</p>
+    <p class="note">Données : CelesTrak, NASA/JPL Horizons, NASA GIBS. Noms de lieux : © OpenStreetMap contributors. Démonstrateur : ne pas utiliser pour l'évitement de collision.</p>
   </div>
 </section>
 
@@ -158,6 +164,7 @@ const h=(t,c,x)=>{const e=document.createElement(t);if(c)e.className=c;if(x!==un
 const clamp=(v,a,b)=>Math.min(Math.max(v,a),Math.max(a,b));
 const num=(v,d=2,u="")=>{const n=Number(v);return Number.isFinite(n)?n.toFixed(d)+u:"—"};
 const mobile=()=>matchMedia("(max-width:700px)").matches;
+const dur=d=>matchMedia("(prefers-reduced-motion:reduce)").matches?0:d;
 const ago=iso=>{if(!iso)return"—";const s=Math.max(0,Math.round((Date.now()-new Date(iso))/1000));return s<60?s+" s":s<3600?Math.floor(s/60)+" min":Math.floor(s/3600)+" h"};
 const dayAgo=n=>new Date(Date.now()-n*864e5).toISOString().slice(0,10);
 const epochMs=e=>Date.parse(/[zZ]|[+-]\d\d:?\d\d$/.test(e)?e:e+"Z");
@@ -187,7 +194,7 @@ function setOpen(id,on){
   save();
 }
 document.querySelectorAll(".pal").forEach((el,i)=>{
-  const id=el.dataset.id;pal[id]=el;
+  const id=el.dataset.id;pal[id]=el;el.setAttribute("role","dialog");el.setAttribute("aria-label",el.dataset.title);
   const s=saved[id]=Object.assign({x:84+i*30,y:70+i*30,open:id==="cat",min:false},saved[id]);
   const head=h("header","ph"),btns=h("span"),mn=h("button","","–"),cl=h("button","","×");
   mn.type=cl.type="button";mn.setAttribute("aria-label","Réduire");cl.setAttribute("aria-label","Fermer");
@@ -216,6 +223,8 @@ addEventListener("keydown",e=>{
   if(n>=1&&n<=ids.length)setOpen(ids[n-1],!saved[ids[n-1]].open);
 });
 
+addEventListener("keydown",e=>{if(e.key!=="Escape")return;const el=document.activeElement&&document.activeElement.closest&&document.activeElement.closest(".pal");if(el)setOpen(el.dataset.id,false)});
+
 /* ---------- Construction des palettes ---------- */
 const GROUPS=[["stations","Stations spatiales"],["active","Objets actifs"],["visual","Visibles à l'œil nu"],["weather","Météo"],["gps-ops","GPS opérationnels"],["geo","Géostationnaires"],["starlink","Starlink"],["oneweb","OneWeb"],["galileo","Galileo (UE)"],["beidou","BeiDou (Chine)"],["glo-ops","GLONASS"],["science","Science"],["amateur","Radioamateurs"],["last-30-days","Lancés ces 30 derniers jours"]];
 const TARGETS=[["sun","Soleil"],["mercury","Mercure"],["venus","Vénus"],["earth","Terre"],["moon","Lune"],["mars","Mars"],["jupiter","Jupiter"],["saturn","Saturne"],["uranus","Uranus"],["neptune","Neptune"]];
@@ -228,11 +237,12 @@ kvRows($("eRows"),[["t","Cible"],["d","Date (TDB)"],["x","X"],["y","Y"],["z","Z"
 
 /* ---------- État ---------- */
 let viewer,pts,selEnt,traceEnt,selPos,live=null,eage=null,ephRow=null,obs=null,cursor=0;
-let catalogue=[],sats=[],byItem=new Map(),selected=null,curGroup="stations",total=0,stale=false;
+let loadSeq=0,catalogue=[],sats=[],byItem=new Map(),selected=null,curGroup="stations",total=0,stale=false;
 let simMs=Date.now(),speed=1,lastTs=performance.now(),lastDigest="",lastFetch=null,showLabel=true;
 const SGP4=!!(window.satellite&&satellite.json2satrec);
 
 /* ---------- Globe ---------- */
+const CARTO_KEY=(()=>{try{const u=new URLSearchParams(location.search).get("carto");if(u)localStorage.setItem("agata-eyes.carto",u);return u||localStorage.getItem("agata-eyes.carto")||""}catch(_){return""}})();
 const GIBS="https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/";
 const gibs=(l,t,ext,lv,mx)=>new Cesium.UrlTemplateImageryProvider({url:GIBS+l+"/default/"+t+"/GoogleMapsCompatible_Level"+lv+"/{z}/{y}/{x}."+ext,maximumLevel:mx||lv,credit:"Imagery © NASA EOSDIS GIBS"});
 const PLACES=`Afrique,3,20,c
@@ -424,62 +434,359 @@ Sao Tomé-et-Príncipe,0.3,6.7,3
 Seychelles,-4.7,55.5,3
 Malte,35.9,14.4,3
 Andorre,42.5,1.6,3
-Maldives,3.2,73.2,3`;
-let names=null;
-let NL=[],dirty=true,lastDec=0;
+Maldives,3.2,73.2,3
+Kinshasa,-4.32,15.31,v
+Lubumbashi,-11.66,27.48,v
+Kisangani,0.52,25.19,v
+Goma,-1.68,29.22,v
+Mbuji-Mayi,-6.14,23.59,v
+Kananga,-5.9,22.4,v
+Bukavu,-2.5,28.86,v
+Brazzaville,-4.27,15.28,v
+Lagos,6.52,3.38,v
+Abuja,9.08,7.4,v
+Le Caire,30.04,31.24,v
+Johannesburg,-26.2,28.05,v
+Le Cap,-33.92,18.42,v
+Pretoria,-25.75,28.19,v
+Nairobi,-1.29,36.82,v
+Addis-Abeba,9.03,38.74,v
+Dar es Salaam,-6.79,39.21,v
+Luanda,-8.84,13.23,v
+Kampala,0.35,32.58,v
+Khartoum,15.5,32.56,v
+Alger,36.75,3.06,v
+Casablanca,33.57,-7.59,v
+Rabat,34.02,-6.84,v
+Tunis,36.8,10.18,v
+Tripoli,32.89,13.19,v
+Dakar,14.69,-17.45,v
+Abidjan,5.36,-4.01,v
+Accra,5.6,-0.19,v
+Bamako,12.64,-8,v
+Ouagadougou,12.37,-1.52,v
+Niamey,13.51,2.11,v
+N'Djamena,12.13,15.05,v
+Yaoundé,3.85,11.5,v
+Libreville,0.39,9.45,v
+Lusaka,-15.39,28.32,v
+Harare,-17.83,31.05,v
+Maputo,-25.97,32.57,v
+Antananarivo,-18.88,47.51,v
+Windhoek,-22.56,17.08,v
+Kigali,-1.95,30.06,v
+Mogadiscio,2.05,45.32,v
+Bangui,4.36,18.56,v
+Juba,4.85,31.58,v
+Conakry,9.64,-13.58,v
+Nouakchott,18.09,-15.98,v
+Paris,48.86,2.35,v
+Londres,51.51,-0.13,v
+Berlin,52.52,13.4,v
+Madrid,40.42,-3.7,v
+Rome,41.9,12.5,v
+Moscou,55.75,37.62,v
+Saint-Pétersbourg,59.93,30.34,v
+Istanbul,41.01,28.98,v
+Kiev,50.45,30.52,v
+Varsovie,52.23,21.01,v
+Vienne,48.21,16.37,v
+Bruxelles,50.85,4.35,v
+Amsterdam,52.37,4.9,v
+Lisbonne,38.72,-9.14,v
+Athènes,37.98,23.73,v
+Stockholm,59.33,18.07,v
+Oslo,59.91,10.75,v
+Helsinki,60.17,24.94,v
+Dublin,53.35,-6.26,v
+Bucarest,44.43,26.1,v
+Budapest,47.5,19.04,v
+Prague,50.08,14.44,v
+Minsk,53.9,27.57,v
+Reykjavik,64.15,-21.94,v
+Pékin,39.9,116.4,v
+Shanghai,31.23,121.47,v
+Hong Kong,22.32,114.17,v
+Tokyo,35.68,139.69,v
+Séoul,37.57,126.98,v
+New Delhi,28.61,77.21,v
+Mumbai,19.08,72.88,v
+Calcutta,22.57,88.36,v
+Dacca,23.81,90.41,v
+Karachi,24.86,67.01,v
+Islamabad,33.68,73.05,v
+Kaboul,34.53,69.17,v
+Téhéran,35.69,51.39,v
+Bagdad,33.31,44.36,v
+Riyad,24.71,46.68,v
+Dubaï,25.2,55.27,v
+Jérusalem,31.77,35.21,v
+Ankara,39.93,32.86,v
+Bangkok,13.76,100.5,v
+Hanoï,21.03,105.85,v
+Hô Chi Minh-Ville,10.82,106.63,v
+Jakarta,-6.21,106.85,v
+Manille,14.6,120.98,v
+Kuala Lumpur,3.14,101.69,v
+Taipei,25.03,121.57,v
+Tachkent,41.3,69.24,v
+Astana,51.17,71.45,v
+Oulan-Bator,47.89,106.91,v
+Colombo,6.93,79.86,v
+Rangoun,16.87,96.2,v
+Novossibirsk,55.03,82.92,v
+New York,40.71,-74.01,v
+Los Angeles,34.05,-118.24,v
+Chicago,41.88,-87.63,v
+Washington,38.9,-77.04,v
+Toronto,43.65,-79.38,v
+Ottawa,45.42,-75.7,v
+Mexico,19.43,-99.13,v
+La Havane,23.11,-82.37,v
+Bogota,4.71,-74.07,v
+Lima,-12.05,-77.04,v
+Santiago,-33.45,-70.67,v
+Buenos Aires,-34.6,-58.38,v
+Brasilia,-15.79,-47.88,v
+São Paulo,-23.55,-46.63,v
+Rio de Janeiro,-22.91,-43.17,v
+Caracas,10.48,-66.9,v
+Quito,-0.18,-78.47,v
+La Paz,-16.5,-68.15,v
+Sydney,-33.87,151.21,v
+Melbourne,-37.81,144.96,v
+Canberra,-35.28,149.13,v
+Auckland,-36.85,174.76,v
+Matadi,-5.82,13.46,m
+Kolwezi,-10.72,25.47,m
+Mbandaka,0.05,18.26,m
+Bunia,1.56,30.25,m
+Likasi,-10.98,26.74,m
+Kalemie,-5.93,29.19,m
+Uvira,-3.4,29.14,m
+Butembo,0.14,29.29,m
+Isiro,2.77,27.62,m
+Boma,-5.85,13.06,m
+Kikwit,-5.04,18.82,m
+Tshikapa,-6.42,20.8,m
+Kindu,-2.95,25.92,m
+Gemena,3.25,19.77,m
+Kamina,-8.74,25,m
+Bandundu,-3.32,17.38,m
+Beni,0.5,29.47,m
+Lisala,2.15,21.52,m
+Lodja,-3.49,23.43,m
+Kabinda,-6.13,24.48,m
+Boende,-0.22,20.87,m
+Alexandrie,31.2,29.92,m
+Durban,-29.86,31.02,m
+Dodoma,-6.16,35.75,m
+Douala,4.05,9.7,m
+Yamoussoukro,6.82,-5.28,m
+Lomé,6.13,1.22,m
+Cotonou,6.37,2.43,m
+Bujumbura,-3.38,29.36,m
+Lilongwe,-13.97,33.79,m
+Kano,12,8.52,m
+Ibadan,7.38,3.95,m
+Mombasa,-4.04,39.67,m
+Pointe-Noire,-4.78,11.86,m
+Lobito,-12.35,13.55,m
+Huambo,-12.78,15.74,m
+Ndola,-12.97,28.64,m
+Kumasi,6.69,-1.62,m
+Bobo-Dioulasso,11.18,-4.3,m
+Oran,35.7,-0.63,m
+Marrakech,31.63,-8,m
+Mwanza,-2.52,32.9,m
+Bulawayo,-20.15,28.58,m
+Beira,-19.84,34.84,m
+Nampula,-15.12,39.27,m
+Tombouctou,16.77,-3.01,m
+Marseille,43.3,5.37,m
+Lyon,45.76,4.84,m
+Milan,45.46,9.19,m
+Barcelone,41.39,2.17,m
+Munich,48.14,11.58,m
+Hambourg,53.55,9.99,m
+Naples,40.85,14.27,m
+Manchester,53.48,-2.24,m
+Lahore,31.55,74.34,m
+Bangalore,12.97,77.59,m
+Chennai,13.08,80.27,m
+Djeddah,21.54,39.17,m
+Abou Dabi,24.45,54.38,m
+Vladivostok,43.12,131.89,m
+Iakoutsk,62.03,129.73,m
+Ekaterinbourg,56.84,60.6,m
+Osaka,34.69,135.5,m
+Canton,23.13,113.26,m
+Chengdu,30.57,104.07,m
+Montréal,45.5,-73.57,m
+Vancouver,49.28,-123.12,m
+San Francisco,37.77,-122.42,m
+Miami,25.76,-80.19,m
+Houston,29.76,-95.37,m
+Montevideo,-34.9,-56.16,m
+Manaus,-3.12,-60.02,m
+Perth,-31.95,115.86,m
+Brisbane,-27.47,153.03,m
+Wellington,-41.29,174.78,m
+Anchorage,61.22,-149.9,m
+Kongo-Central,-5.5,14.3,p
+Kwango,-6.5,17.5,p
+Kwilu,-5.2,19,p
+Mai-Ndombe,-2.5,18.5,p
+Kasaï,-5.5,21.3,p
+Kasaï-Central,-6,22.3,p
+Kasaï-Oriental,-6.7,24,p
+Lomami,-6.2,25,p
+Sankuru,-3,23.5,p
+Maniema,-3,26.2,p
+Sud-Kivu,-3.3,28.3,p
+Nord-Kivu,-0.9,28.9,p
+Ituri,2.2,29.5,p
+Haut-Uélé,3.6,28,p
+Bas-Uélé,3.9,24.5,p
+Tshopo,1.2,25.5,p
+Mongala,2.1,21.5,p
+Nord-Ubangi,3.9,21,p
+Sud-Ubangi,3,19,p
+Équateur,0.5,19.3,p
+Tshuapa,-1.1,22.5,p
+Tanganyika,-6.8,28,p
+Haut-Lomami,-8.5,26,p
+Lualaba,-10.2,24.5,p
+Haut-Katanga,-10.8,27.5,p
+Colombie-Britannique,54,-125,p
+Alberta,55,-115,p
+Saskatchewan,54,-106,p
+Manitoba,55,-98,p
+Ontario,50,-85,p
+Québec,52,-72,p
+Nouveau-Brunswick,46.5,-66,p
+Nouvelle-Écosse,45,-63,p
+Terre-Neuve-et-Labrador,53,-60,p
+Yukon,63,-135,p
+Territoires du Nord-Ouest,65,-120,p
+Nunavut,66,-95,p
+Australie-Occidentale,-26,121,p
+Territoire du Nord,-19.5,133,p
+Australie-Méridionale,-30,135,p
+Queensland,-22.5,144,p
+Nouvelle-Galles du Sud,-32.5,146,p
+Victoria,-37,144.5,p
+Tasmanie,-42,146.5,p
+Cap-Occidental,-33.5,20,p
+Cap-Oriental,-32.5,26.5,p
+Cap-Nord,-29.5,21.5,p
+État-Libre,-28.5,26.5,p
+KwaZulu-Natal,-29,31,p
+Gauteng,-26.1,28.1,p
+Mpumalanga,-25.5,30.5,p
+Limpopo,-23.5,29.5,p
+Nord-Ouest,-26.5,25.5,p`;
+const lbl=$("lbl");
+let NL=[],dirty=true,lastDec=0,cx=null;
+const SZ={c:[19,700,1.1],o:[14,500,0],1:[15,600,.6],2:[13,600,0],3:[12,500,0],v:[13,600,0],m:[12,500,0],p:[11,500,.5]};
+const LIM={c:[9e6,1e9],o:[5e6,1e9],1:[0,22e6],2:[0,9e6],3:[0,4.5e6],v:[0,7e6],p:[0,5.5e6],m:[0,3e6]};
+const TIER={c:0,o:0,1:1,2:2,3:3,v:4,p:5,m:6};
+function addPlace(n,la,lo,k){
+  const z=SZ[k];if(!z||!isFinite(la)||!isFinite(lo))return;
+  cx.font=z[1]+" "+z[0]+"px system-ui,sans-serif";
+  NL.push({n,k,t:TIER[k],pos:Cesium.Cartesian3.fromDegrees(lo,la,5000),el:null,on:false,w:cx.measureText(n).width+n.length*z[2]+(k==="v"||k==="m"?12:8),h:z[0]*1.7});
+}
 function buildNames(){
-  names=viewer.scene.primitives.add(new Cesium.LabelCollection());
-  const R={c:[19,"700",0],o:[14,"italic 500",0],1:[14,"600",1],2:[12,"600",2],3:[11,"500",3]},cx=document.createElement("canvas").getContext("2d");
-  for(const row of PLACES.split("\n").filter(Boolean)){
-    const[n,la,lo,k]=row.split(","),r=R[k];if(!r)continue;
-    const font=r[1]+" "+r[0]+"px system-ui,sans-serif",pos=Cesium.Cartesian3.fromDegrees(+lo,+la,8000);cx.font=font;
-    const l=names.add({text:n,position:pos,font,show:false,fillColor:k==="o"?Cesium.Color.fromCssColorString("#9fd0ff"):Cesium.Color.WHITE,
-      outlineColor:Cesium.Color.fromCssColorString("#0a0e17"),outlineWidth:3,style:Cesium.LabelStyle.FILL_AND_OUTLINE,
-      horizontalOrigin:Cesium.HorizontalOrigin.CENTER,verticalOrigin:Cesium.VerticalOrigin.CENTER});
-    NL.push({l,pos,k,t:r[2],w:cx.measureText(n).width+12,h:r[0]*1.6});
-  }
+  cx=document.createElement("canvas").getContext("2d");
+  for(const row of PLACES.split("\n").filter(Boolean)){const[n,la,lo,k]=row.split(",");addPlace(n,+la,+lo,k)}
   NL.sort((a,b)=>a.t-b.t);
   const cam=viewer.camera;cam.percentageChanged=.01;cam.changed.addEventListener(()=>{dirty=true});
-  cam.moveEnd.addEventListener(()=>{dirty=true;lastDec=0;viewer.scene.requestRender()});
-  viewer.scene.postRender.addEventListener(()=>{const n=performance.now();if(dirty&&n-lastDec>100){dirty=false;lastDec=n;declutter()}});
+  cam.moveEnd.addEventListener(()=>{dirty=true;lastDec=0;viewer.scene.requestRender();clearTimeout(buildNames.t);buildNames.t=setTimeout(wantCells,500)});
+  viewer.scene.postRender.addEventListener(()=>{
+    if(lbl.style.display==="none")return;
+    const n=performance.now();if(dirty&&n-lastDec>100){dirty=false;lastDec=n;declutter()}
+    placeLabels();
+  });
   dirty=true;
 }
+let vis=[];
+const project=(sc,occ,it)=>occ.isPointVisible(it.pos)?Cesium.SceneTransforms.worldToWindowCoordinates(sc,it.pos):null;
 function declutter(){
-  if(!names||!names.show)return;
   const sc=viewer.scene,cam=viewer.camera,h=cam.positionCartographic.height,occ=new Cesium.EllipsoidalOccluder(Cesium.Ellipsoid.WGS84,cam.positionWC);
-  const W=sc.canvas.clientWidth,H=sc.canvas.clientHeight,boxes=[];let changed=false;
+  const W=sc.canvas.clientWidth,H=sc.canvas.clientHeight,boxes=[];vis=[];
   for(const it of NL){
-    let on=it.t===0?h>(it.k==="o"?5e6:9e6):h<(it.t===1?22e6:it.t===2?8e6:4e6);
-    if(on){
-      const p=occ.isPointVisible(it.pos)?Cesium.SceneTransforms.worldToWindowCoordinates(sc,it.pos):null;
-      if(p&&p.x>-40&&p.x<W+40&&p.y>-20&&p.y<H+20){
+    const L=LIM[it.k];let on=false;
+    if(h>=L[0]&&h<=L[1]){
+      const p=project(sc,occ,it);
+      if(p&&p.x>-60&&p.x<W+60&&p.y>-30&&p.y<H+30){
         const x0=p.x-it.w/2,y0=p.y-it.h/2,x1=x0+it.w,y1=y0+it.h;
-        if(boxes.some(b=>x0<b[2]&&x1>b[0]&&y0<b[3]&&y1>b[1]))on=false;else boxes.push([x0,y0,x1,y1]);
-      }else on=false;
+        if(!boxes.some(b=>x0<b[2]&&x1>b[0]&&y0<b[3]&&y1>b[1])){boxes.push([x0,y0,x1,y1]);on=true}
+      }
     }
-    if(it.l.show!==on){it.l.show=on;changed=true}
+    if(on){
+      if(!it.el){const e=document.createElement("div");e.className="lb lb"+it.k;e.textContent=it.n;lbl.append(e);it.el=e}
+      it.el.style.display="";vis.push(it);
+    }else if(it.el)it.el.style.display="none";
+    it.on=on;
   }
-  if(changed)sc.requestRender();
+}
+function placeLabels(){
+  if(!vis.length)return;
+  const sc=viewer.scene,occ=new Cesium.EllipsoidalOccluder(Cesium.Ellipsoid.WGS84,viewer.camera.positionWC);
+  for(const it of vis){
+    const p=project(sc,occ,it);
+    if(!p){it.el.style.visibility="hidden";continue}
+    it.el.style.visibility="visible";
+    it.el.style.transform="translate("+Math.round(p.x)+"px,"+Math.round(p.y)+"px) translate(-50%,-50%)";
+  }
+}
+/* Détail local (villes, provinces) : OpenStreetMap via Overpass, par cases de 2°, mis en cache */
+const cells=new Map(),queue=[];let busy=false,warnedOv=false;
+function wantCells(){
+  if(lbl.style.display==="none")return;
+  const cam=viewer.camera;if(cam.positionCartographic.height>2.5e6)return;
+  const r=cam.computeViewRectangle();if(!r)return;
+  const D=Cesium.Math.toDegrees,w=D(r.west),e=D(r.east),s=D(r.south),n=D(r.north);
+  if(e<w||e-w>12||n-s>12)return;
+  for(let la=Math.floor(s/2);la<=Math.floor(n/2);la++)for(let lo=Math.floor(w/2);lo<=Math.floor(e/2);lo++){
+    const k=la+","+lo,t=cells.get(k);
+    if(t===undefined||(t>0&&t<Date.now())){cells.set(k,-1);queue.push([la*2,lo*2,k])}
+  }
+  pump();
+}
+async function pump(){
+  if(busy||!queue.length)return;busy=true;const[s,w,k]=queue.shift();
+  try{
+    const q='[out:json][timeout:12];node["place"~"^(city|town|state|province|region)$"]["name"]('+s+","+w+","+(s+2)+","+(w+2)+");out 250;";
+    const r=await fetch("https://overpass-api.de/api/interpreter?data="+encodeURIComponent(q),{signal:AbortSignal.timeout?AbortSignal.timeout(15000):undefined});
+    if(!r.ok)throw new Error("HTTP "+r.status);
+    const j=await r.json(),known=new Set(NL.map(x=>x.n.toLowerCase()));
+    for(const el of j.elements||[]){
+      const t=el.tags||{},n=t["name:fr"]||t.name;if(!n||known.has(n.toLowerCase()))continue;known.add(n.toLowerCase());
+      addPlace(n,el.lat,el.lon,t.place==="city"?"v":t.place==="town"?"m":"p");
+    }
+    NL.sort((a,b)=>a.t-b.t);cells.set(k,0);dirty=true;viewer.scene.requestRender();
+  }catch(_){cells.set(k,Date.now()+60000);if(!warnedOv){warnedOv=true;toast("Noms détaillés indisponibles pour le moment.")}}
+  busy=false;if(queue.length)setTimeout(pump,800);
 }
 const isNasa=()=>["viirs","bm","night"].includes($("base").value);
-function applyNames(){if(names)names.show=$("nm").checked&&isNasa();dirty=true;if(viewer)viewer.scene.requestRender()}
+function applyNames(){lbl.style.display=$("nm").checked&&isNasa()?"":"none";dirty=true;if(viewer)viewer.scene.requestRender()}
 function setBase(){
-  const k=$("base").value,nasa=isNasa();
+  let k=$("base").value;const lit=$("light").checked;let warned=false;
+  if(k==="voyager"&&!CARTO_KEY){toast("Carto Voyager demande une clé gratuite (carto.com/basemaps/apikey) : ajoutez ?carto=VOTRE_CLE à l'adresse. OpenStreetMap est utilisé en attendant.");$("base").value=k="osm"}
   $("dateBox").style.display=k==="viirs"?"":"none";
   const L=viewer.imageryLayers;L.removeAll();
-  const providers={
-    voyager:()=>new Cesium.UrlTemplateImageryProvider({url:"https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png",maximumLevel:19,credit:"© OpenStreetMap contributors © CARTO"}),
-    osm:()=>new Cesium.UrlTemplateImageryProvider({url:"https://tile.openstreetmap.org/{z}/{x}/{y}.png",maximumLevel:19,credit:"© OpenStreetMap contributors"}),
-    viirs:()=>gibs("VIIRS_SNPP_CorrectedReflectance_TrueColor",$("imgDate").value||dayAgo(1),"jpg",9),
-    bm:()=>gibs("BlueMarble_ShadedRelief_Bathymetry","default","jpeg",8),
-    night:()=>gibs("VIIRS_Black_Marble","default","png",8)
-  };
-  const p=(providers[k]||providers.voyager)();
-  let warned=false;p.errorEvent.addEventListener(()=>{if(!warned){warned=true;toast("Certaines tuiles du fond de carte sont indisponibles (essayez une autre date ou un autre fond).")}});
-  if(k==="viirs")L.addImageryProvider(gibs("BlueMarble_ShadedRelief_Bathymetry","default","jpeg",8));
-  const top=L.addImageryProvider(p);
-  if(k==="viirs"){top.colorToAlpha=Cesium.Color.BLACK;top.colorToAlphaThreshold=.03}
-  if(nasa&&$("ref").checked)L.addImageryProvider(gibs("Reference_Features_15m","default","png",13,8));
+  const add=(p,fn)=>{p.errorEvent.addEventListener(()=>{if(!warned){warned=true;toast("Certaines tuiles du fond de carte sont indisponibles (essayez une autre date ou un autre fond).")}});const l=L.addImageryProvider(p);if(fn)fn(l)};
+  const night=l=>{l.dayAlpha=0;l.nightAlpha=1},day=l=>{if(lit)l.nightAlpha=0};
+  if(k==="voyager")add(new Cesium.UrlTemplateImageryProvider({url:"https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png?key="+encodeURIComponent(CARTO_KEY),maximumLevel:19,credit:"© OpenStreetMap contributors © CARTO"}));
+  else if(k==="osm")add(new Cesium.UrlTemplateImageryProvider({url:"https://tile.openstreetmap.org/{z}/{x}/{y}.png",maximumLevel:19,credit:"© OpenStreetMap contributors"}));
+  else if(k==="night")add(gibs("VIIRS_Black_Marble","default","png",8));
+  else{
+    if(lit)add(gibs("VIIRS_Black_Marble","default","png",8),night);
+    add(gibs("BlueMarble_ShadedRelief_Bathymetry","default","jpeg",8),day);
+    if(k==="viirs")add(gibs("VIIRS_SNPP_CorrectedReflectance_TrueColor",$("imgDate").value||dayAgo(1),"jpg",9),l=>{day(l);l.colorToAlpha=Cesium.Color.BLACK;l.colorToAlphaThreshold=.03});
+  }
+  if(isNasa()&&$("ref").checked)add(gibs("Reference_Features_15m","default","png",13,8));
   applyNames();
 }
 const QL=[[0.75,3,1],[1.0,2,2],[1.25,1.75,4]];let qTarget=1;
@@ -501,7 +808,7 @@ function watchFps(){
     else if(f>50&&viewer.resolutionScale<qTarget)viewer.resolutionScale=Math.min(qTarget,viewer.resolutionScale+.15);
   });
 }
-const homeView=()=>viewer&&viewer.camera.flyTo({destination:Cesium.Cartesian3.fromDegrees(12,14,23500000),duration:1.3});
+const homeView=()=>viewer&&viewer.camera.flyTo({destination:Cesium.Cartesian3.fromDegrees(12,14,23500000),duration:dur(1.3)});
 function initGlobe(){
   if(!window.Cesium){toast("Bibliothèque 3D indisponible : vérifiez la connexion.");return}
   try{
@@ -564,7 +871,7 @@ function drawTrace(){
   for(let i=0;i<=120;i++){const d=new Date(simMs+per*i/120),p=ecef(selected,d,satellite.gstime(d));if(p)arr.push(p)}
   if(arr.length>1)traceEnt=viewer.entities.add({polyline:{positions:arr,width:1.5,arcType:Cesium.ArcType.NONE,material:Cesium.Color.fromCssColorString("#f5b942").withAlpha(.7)}});
 }
-function flyToSel(){if(viewer&&live)viewer.camera.flyTo({destination:Cesium.Cartesian3.fromDegrees(live.lon,live.lat,Math.max(live.alt*3e3,6e6)),duration:1.2})}
+function flyToSel(){if(viewer&&live)viewer.camera.flyTo({destination:Cesium.Cartesian3.fromDegrees(live.lon,live.lat,Math.max(live.alt*3e3,6e6)),duration:dur(1.2)})}
 
 /* ---------- Catalogue ---------- */
 function buildSats(){
@@ -590,22 +897,24 @@ function renderList(){
 }
 const dkey=g=>"agata-eyes.gp."+g;
 function directCache(g){try{const c=JSON.parse(localStorage.getItem(dkey(g))||"null");if(c&&Date.now()-c.t<72e5)return c.r}catch(_){}return null}
+async function sha256(t){try{return[...new Uint8Array(await crypto.subtle.digest("SHA-256",new TextEncoder().encode(t)))].map(b=>b.toString(16).padStart(2,"0")).join("")}catch(_){return""}}
 async function direct(group){
   const r=await fetch("https://celestrak.org/NORAD/elements/gp.php?GROUP="+encodeURIComponent(group)+"&FORMAT=JSON");
   if(!r.ok)throw new Error("HTTP "+r.status);
   const txt=await r.text();let a;try{a=JSON.parse(txt)}catch(_){throw new Error("réponse invalide")}
   if(!Array.isArray(a))throw new Error("réponse invalide");
-  const sha=[...new Uint8Array(await crypto.subtle.digest("SHA-256",new TextEncoder().encode(txt)))].map(b=>b.toString(16).padStart(2,"0")).join("");
+  const sha=await sha256(txt);
   const out={data:a.slice(0,3000),total:a.length,stale:false,sha256:sha,fetched_at:new Date().toISOString(),direct:true};
   try{localStorage.setItem(dkey(group),JSON.stringify({t:Date.now(),r:out}))}catch(_){}
   return out;
 }
 async function loadCatalogue(group){
-  curGroup=group||curGroup;$("load").disabled=true;
+  curGroup=group||curGroup;$("load").disabled=true;const my=++loadSeq;
   $("list").replaceChildren(h("div","empty","Chargement du catalogue…"));
   const t0=performance.now();
   try{
     let r=directCache(curGroup);if(!r)try{r=await api("/api/v1/satellites?group="+encodeURIComponent(curGroup))}catch(err){try{r=await direct(curGroup);toast("Le serveur n'accède pas à CelesTrak : chargement direct depuis votre navigateur.")}catch(_){throw err}}
+    if(my!==loadSeq)return;
     catalogue=Array.isArray(r.data)?r.data:[];total=r.total||catalogue.length;stale=!!r.stale;
     lastDigest=r.sha256||"";lastFetch=r.fetched_at;selected=null;selEnt&&(selEnt.show=false);drawTrace();
     buildSats();renderList();tick();
@@ -694,7 +1003,7 @@ $("aDoc").onclick=()=>window.open("/docs","_blank","noopener,noreferrer");
 $("base").onchange=$("imgDate").onchange=$("ref").onchange=()=>viewer&&setBase();
 $("nm").onchange=applyNames;
 $("qual").onchange=()=>{try{localStorage.setItem("agata-eyes.q",$("qual").value)}catch(_){}if(viewer)applyQuality()};
-$("light").onchange=e=>{if(viewer){viewer.scene.globe.enableLighting=e.target.checked;viewer.scene.requestRender()}};
+$("light").onchange=e=>{if(viewer){viewer.scene.globe.enableLighting=e.target.checked;setBase()}};
 $("oObs").onclick=()=>{if(!navigator.geolocation)return toast("Géolocalisation indisponible.");navigator.geolocation.getCurrentPosition(q=>{obs={latitude:q.coords.latitude*Math.PI/180,longitude:q.coords.longitude*Math.PI/180,height:(q.coords.altitude||0)/1e3};toast("Point d'observation enregistré (il reste dans votre navigateur).")},()=>toast("Position refusée ou indisponible."),{timeout:10000})};
 $("spd").onchange=e=>{speed=Number(e.target.value)};
 $("showLbl").onchange=e=>{showLabel=e.target.checked};
@@ -706,6 +1015,7 @@ $("oCenter").onclick=()=>live?flyToSel():toast("Sélectionnez d'abord un objet."
 $("oAi").onclick=()=>selected?ask("Résume l'orbite de cet objet et précise la fiabilité de ses éléments."):toast("Sélectionnez d'abord un objet.");
 $("oApi").onclick=()=>{const id=selected&&selected.it.NORAD_CAT_ID;id?window.open("/api/v1/satellites/"+encodeURIComponent(id),"_blank","noopener,noreferrer"):toast("Aucun numéro NORAD pour cet objet.")};
 
+document.addEventListener("visibilitychange",()=>{if(!document.hidden&&viewer){dirty=true;viewer.scene.requestRender()}});
 initGlobe();
 if(!SGP4)toast("Propagation SGP4 indisponible : le catalogue s'affiche sans positions.");
 setInterval(tick,1000);
