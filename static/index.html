@@ -1,0 +1,414 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0a0e17">
+<meta name="description" content="AgAtA-EyEs — catalogue satellite, éphémérides NASA/JPL, provenance des données et assistant IA.">
+<title>AgAtA-EyEs</title>
+<link rel="stylesheet" href="https://cesium.com/downloads/cesiumjs/releases/1.132/Build/Cesium/Widgets/widgets.css">
+<script src="https://cesium.com/downloads/cesiumjs/releases/1.132/Build/Cesium/Cesium.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/satellite.js@5.0.0/dist/satellite.min.js"></script>
+<style>
+:root{color-scheme:dark;--bg:#0a0e17;--glass:rgba(14,20,34,.86);--line:#27334d;--tx:#e8eefc;--mu:#8b9bb8;--ac:#f5b942;--ok:#4fd1c5;--bad:#ff7a7a}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--tx);font:13px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;overflow:hidden}
+#globe{position:fixed;inset:0}
+button,select,input,textarea{font:inherit;color:inherit}
+.bt,.in{background:#131c30;border:1px solid var(--line);border-radius:8px;padding:7px 10px}
+.bt{cursor:pointer}.bt:hover{border-color:var(--ac)}.bt:disabled{opacity:.5;cursor:wait}
+.in{width:100%;min-width:0}
+:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
+a{color:var(--ac)}
+.brand{position:fixed;top:12px;left:12px;z-index:50;display:flex;align-items:center;gap:8px;padding:7px 14px 7px 10px;border-radius:999px;background:var(--glass);border:1px solid var(--line);backdrop-filter:blur(14px);cursor:pointer}
+.brand svg{width:22px;color:var(--ac)}.brand b{font-weight:650;letter-spacing:.02em}.brand span{color:var(--mu);font-size:12px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--mu)}.dot.ok{background:var(--ok)}.dot.w{background:var(--ac)}
+.dock{position:fixed;left:12px;top:62px;z-index:50;display:flex;flex-direction:column;gap:6px;padding:6px;border-radius:14px;background:var(--glass);border:1px solid var(--line);backdrop-filter:blur(14px)}
+.dock button{width:38px;height:38px;border-radius:10px;border:1px solid transparent;background:none;cursor:pointer;font-size:17px}
+.dock button:hover{border-color:var(--line)}.dock button[aria-pressed=true]{background:#1b2742;border-color:var(--ac);color:var(--ac)}
+.pal{position:fixed;z-index:20;display:flex;flex-direction:column;min-width:240px;max-width:94vw;max-height:82vh;min-height:90px;background:var(--glass);border:1px solid var(--line);border-radius:14px;backdrop-filter:blur(16px);box-shadow:0 16px 48px #0008;resize:both;overflow:hidden}
+.pal.hid,body.imm .pal,body.imm .dock{display:none}
+.pal.min{height:auto!important;min-height:0;resize:none}.pal.min .pb{display:none}
+.ph{display:flex;align-items:center;justify-content:space-between;padding:6px 8px 6px 12px;border-bottom:1px solid var(--line);cursor:grab;touch-action:none;user-select:none}
+.ph b{font-weight:600}.ph button{width:26px;height:26px;border:0;border-radius:6px;background:none;cursor:pointer;color:var(--mu)}.ph button:hover{background:#1b2742;color:var(--tx)}
+.pb{padding:12px;overflow:auto;display:flex;flex-direction:column;gap:10px;min-height:0;flex:1}
+.row{display:flex;gap:8px;align-items:center}.row>*{flex:1}.row>.bt{flex:0 0 auto}
+.kv{display:flex;justify-content:space-between;gap:12px;padding:5px 0;border-bottom:1px solid #27334d66}.kv span{color:var(--mu)}.kv b{font-weight:500;text-align:right;overflow-wrap:anywhere}
+.list{display:flex;flex-direction:column;overflow:auto;min-height:70px;flex:1}
+.item{display:flex;justify-content:space-between;gap:8px;padding:8px 6px;border:0;border-bottom:1px solid #27334d66;background:none;text-align:left;cursor:pointer}
+.item:hover,.item.on{background:#1b2742}.item small{color:var(--mu);white-space:nowrap}
+.empty,.note{color:var(--mu);font-size:12px;margin:0}
+.chk{display:flex;gap:8px;align-items:center}
+label.f{display:flex;flex-direction:column;gap:4px;color:var(--mu)}
+.pill{font-size:11px;padding:2px 8px;border-radius:99px;background:#12342f;color:var(--ok);white-space:nowrap}.pill.w{background:#3a2d12;color:var(--ac)}.pill.b{background:#3d1a1f;color:var(--bad)}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.met{background:#101828;border:1px solid var(--line);border-radius:10px;padding:8px}.met span{color:var(--mu);font-size:11px}.met b{display:block;font-size:18px;font-weight:600}
+.chat{flex:1;min-height:150px;overflow:auto;display:flex;flex-direction:column;gap:8px}
+.msg{padding:8px 10px;border-radius:10px;white-space:pre-wrap;overflow-wrap:anywhere;max-width:94%}.msg.me{align-self:flex-end;background:#1b2742}.msg.ai{background:#131c30;border:1px solid var(--line)}.msg.err{border-color:var(--bad);color:var(--bad)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}.chip{border:1px solid var(--line);border-radius:99px;background:none;padding:4px 10px;cursor:pointer;color:var(--mu)}.chip:hover{color:var(--ac);border-color:var(--ac)}
+textarea.in{resize:none}h3{margin:0;font-size:16px}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:90;background:#131c30;border:1px solid var(--line);border-radius:10px;padding:9px 14px;max-width:90vw}.toast:empty{display:none}
+@media(max-width:700px){.dock{top:auto;bottom:10px;left:50%;transform:translateX(-50%);flex-direction:row}.pal{left:8px!important;right:8px;top:auto!important;bottom:68px;width:auto!important;height:auto!important;max-height:58vh;resize:none}.brand span{display:none}}
+</style>
+</head>
+<body>
+<div id="globe" aria-label="Globe 3D interactif"></div>
+
+<button class="brand" id="brand" type="button" title="Afficher ou masquer les palettes (H)">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3.2" fill="currentColor"/></svg>
+  <b>AgAtA-EyEs</b><i class="dot" id="dot"></i><span id="conn">Connexion…</span>
+</button>
+
+<nav class="dock" aria-label="Palettes">
+  <button type="button" data-open="cat" title="Catalogue (1)" aria-label="Catalogue" aria-pressed="false">☷</button>
+  <button type="button" data-open="obj" title="Objet sélectionné (2)" aria-label="Objet sélectionné" aria-pressed="false">◎</button>
+  <button type="button" data-open="eph" title="Éphémérides JPL (3)" aria-label="Éphémérides JPL" aria-pressed="false">☉</button>
+  <button type="button" data-open="view" title="Vue et temps (4)" aria-label="Vue et temps" aria-pressed="false">◐</button>
+  <button type="button" data-open="ai" title="Assistant IA (5)" aria-label="Assistant IA" aria-pressed="false">✧</button>
+  <button type="button" data-open="tele" title="Système et provenance (6)" aria-label="Système et provenance" aria-pressed="false">≋</button>
+</nav>
+
+<section class="pal hid" data-id="cat" data-title="Catalogue" style="width:310px;height:430px">
+  <div class="pb">
+    <input id="q" class="in" type="search" placeholder="Nom ou numéro NORAD" aria-label="Rechercher un objet">
+    <div class="row"><select id="grp" class="in" aria-label="Groupe du catalogue"></select><button id="load" class="bt" type="button">Charger</button></div>
+    <div id="list" class="list"></div>
+    <p class="note" id="catNote">Chargement…</p>
+  </div>
+</section>
+
+<section class="pal hid" data-id="obj" data-title="Objet sélectionné" style="width:320px">
+  <div class="pb">
+    <h3 id="oName">Aucun objet sélectionné</h3>
+    <div id="oRows"></div>
+    <label class="chk"><input type="checkbox" id="trace" checked> Tracer la trajectoire sur une période</label>
+    <div class="row"><button id="oCenter" class="bt" type="button">Centrer</button><button id="oAi" class="bt" type="button">Demander à l'IA</button><button id="oApi" class="bt" type="button">Fiche API</button></div>
+    <p class="note">Positions calculées par SGP4 à partir des éléments CelesTrak : la précision diminue avec l'âge des éléments.</p>
+  </div>
+</section>
+
+<section class="pal hid" data-id="eph" data-title="Éphémérides NASA/JPL" style="width:320px">
+  <div class="pb">
+    <div class="row"><select id="eT" class="in" aria-label="Corps céleste"></select><button id="eGo" class="bt" type="button">Interroger</button></div>
+    <div id="eRows"></div>
+    <p class="note">Vecteur d'état du jour, par rapport au barycentre du système solaire (km, km/s).</p>
+  </div>
+</section>
+
+<section class="pal hid" data-id="view" data-title="Vue et temps" style="width:290px">
+  <div class="pb">
+    <label class="f">Fond de carte<select id="base" class="in"><option value="nasa">NASA Blue Marble</option><option value="osm">OpenStreetMap</option></select></label>
+    <label class="chk"><input type="checkbox" id="showPts" checked> Afficher les satellites</label>
+    <label class="chk"><input type="checkbox" id="showLbl" checked> Étiquette de l'objet sélectionné</label>
+    <label class="f">Vitesse du temps<select id="spd" class="in"><option value="1">Temps réel</option><option value="60">×60</option><option value="600">×600</option></select></label>
+    <div class="kv"><span>Heure simulée (UTC)</span><b id="simT">—</b></div>
+    <div class="row"><button id="vNow" class="bt" type="button">Maintenant</button><button id="vHome" class="bt" type="button">Vue globale</button></div>
+    <button id="vImm" class="bt" type="button">Mode immersif (touche H)</button>
+  </div>
+</section>
+
+<section class="pal hid" data-id="ai" data-title="Assistant IA · Gemini" style="width:340px;height:440px">
+  <div class="pb">
+    <div id="chat" class="chat" aria-live="polite"></div>
+    <div id="chips" class="chips"></div>
+    <div class="row"><textarea id="aiQ" class="in" rows="2" maxlength="1200" placeholder="Posez une question sur les données affichées" aria-label="Question"></textarea><button id="aiGo" class="bt" type="button">Envoyer</button></div>
+    <p class="note">Réponses générées par Gemini à partir des données affichées ; elles peuvent contenir des erreurs.</p>
+  </div>
+</section>
+
+<section class="pal hid" data-id="tele" data-title="Système et provenance" style="width:320px">
+  <div class="pb">
+    <div class="grid">
+      <div class="met"><span>Objets chargés</span><b id="tCount">—</b></div>
+      <div class="met"><span>API</span><b id="tApi">—</b></div>
+      <div class="met"><span>Âge des données</span><b id="tAge">—</b></div>
+      <div class="met"><span>Intégrité</span><b id="tInt">—</b></div>
+    </div>
+    <div class="kv"><span>CelesTrak</span><b><i class="pill w" id="pCt">En attente</i></b></div>
+    <div class="kv"><span>NASA/JPL Horizons</span><b><i class="pill" id="pJpl">Prêt</i></b></div>
+    <div class="kv"><span>Base de données</span><b><i class="pill w" id="pDb">…</i></b></div>
+    <div class="kv"><span>Assistant IA</span><b><i class="pill w" id="pAi">…</i></b></div>
+    <div class="kv"><span>Empreinte SHA-256</span><b id="tDig">—</b></div>
+    <div class="row"><button id="aRef" class="bt" type="button">Actualiser le journal</button><button id="aDoc" class="bt" type="button">Documentation API</button></div>
+    <div id="audit"></div>
+    <p class="note">Données : CelesTrak, NASA/JPL Horizons, NASA GIBS, OpenStreetMap. Démonstrateur : ne pas utiliser pour l'évitement de collision.</p>
+  </div>
+</section>
+
+<div id="toast" class="toast" role="status"></div>
+
+<script>
+(()=>{"use strict";
+const $=id=>document.getElementById(id);
+const h=(t,c,x)=>{const e=document.createElement(t);if(c)e.className=c;if(x!==undefined)e.textContent=x;return e};
+const clamp=(v,a,b)=>Math.min(Math.max(v,a),Math.max(a,b));
+const num=(v,d=2,u="")=>{const n=Number(v);return Number.isFinite(n)?n.toFixed(d)+u:"—"};
+const mobile=()=>matchMedia("(max-width:700px)").matches;
+const ago=iso=>{if(!iso)return"—";const s=Math.max(0,Math.round((Date.now()-new Date(iso))/1000));return s<60?s+" s":s<3600?Math.floor(s/60)+" min":Math.floor(s/3600)+" h"};
+const epochMs=e=>Date.parse(/[zZ]|[+-]\d\d:?\d\d$/.test(e)?e:e+"Z");
+function toast(m){const e=$("toast");e.textContent=m;clearTimeout(toast.t);toast.t=setTimeout(()=>{e.textContent=""},3500)}
+async function api(path,o={}){
+  const r=await fetch(path,{...o,headers:{Accept:"application/json",...(o.headers||{})}});
+  const b=await r.json().catch(()=>({}));
+  if(!r.ok)throw new Error(typeof b.detail==="string"?b.detail:"Erreur HTTP "+r.status);
+  return b;
+}
+function kvRows(box,defs,out){for(const[k,l]of defs){const r=h("div","kv"),v=h("b","","—");r.append(h("span","",l),v);box.append(r);out[k]=v}}
+function setPill(id,t,c){const e=$(id);e.textContent=t;e.className="pill "+(c||"")}
+function setConn(ok,t){$("dot").className="dot "+(ok?"ok":"w");$("conn").textContent=t;$("tApi").textContent=ok?"En ligne":"Dégradé";$("tApi").style.color=ok?"var(--ok)":"var(--ac)"}
+
+/* ---------- Palettes flottantes ---------- */
+const KEY="agata-eyes.palettes.v1";
+let saved={};try{saved=JSON.parse(localStorage.getItem(KEY)||"{}")}catch(_){saved={}}
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(saved))}catch(_){}};
+let z=30;const pal={};
+const dockBtn=id=>document.querySelector('.dock [data-open="'+id+'"]');
+function place(id){const s=saved[id],el=pal[id];s.x=clamp(s.x,0,innerWidth-120);s.y=clamp(s.y,0,innerHeight-50);el.style.left=s.x+"px";el.style.top=s.y+"px"}
+function setOpen(id,on){
+  const s=saved[id],el=pal[id];
+  if(on&&mobile())for(const o in pal)if(o!==id&&saved[o].open)setOpen(o,false);
+  s.open=on;el.classList.toggle("hid",!on);dockBtn(id).setAttribute("aria-pressed",String(on));
+  if(on){document.body.classList.remove("imm");place(id);el.style.zIndex=++z}
+  save();
+}
+document.querySelectorAll(".pal").forEach((el,i)=>{
+  const id=el.dataset.id;pal[id]=el;
+  const s=saved[id]=Object.assign({x:84+i*30,y:70+i*30,open:id==="cat",min:false},saved[id]);
+  const head=h("header","ph"),btns=h("span"),mn=h("button","","–"),cl=h("button","","×");
+  mn.type=cl.type="button";mn.setAttribute("aria-label","Réduire");cl.setAttribute("aria-label","Fermer");
+  btns.append(mn,cl);head.append(h("b","",el.dataset.title),btns);el.prepend(head);
+  el.classList.toggle("min",s.min);
+  mn.onclick=()=>{s.min=!s.min;el.classList.toggle("min",s.min);save()};
+  cl.onclick=()=>setOpen(id,false);
+  el.addEventListener("pointerdown",()=>{el.style.zIndex=++z});
+  head.addEventListener("pointerdown",e=>{
+    if(e.target.closest("button")||mobile())return;
+    const r=el.getBoundingClientRect(),dx=e.clientX-r.left,dy=e.clientY-r.top;
+    head.setPointerCapture(e.pointerId);
+    const mv=ev=>{s.x=clamp(ev.clientX-dx,0,innerWidth-120);s.y=clamp(ev.clientY-dy,0,innerHeight-50);el.style.left=s.x+"px";el.style.top=s.y+"px"};
+    const up=()=>{head.removeEventListener("pointermove",mv);head.removeEventListener("pointerup",up);head.removeEventListener("pointercancel",up);save()};
+    head.addEventListener("pointermove",mv);head.addEventListener("pointerup",up);head.addEventListener("pointercancel",up);
+  });
+});
+for(const id in pal)setOpen(id,saved[id].open);
+document.querySelector(".dock").addEventListener("click",e=>{const b=e.target.closest("[data-open]");if(b)setOpen(b.dataset.open,!saved[b.dataset.open].open)});
+$("brand").onclick=()=>document.body.classList.toggle("imm");
+addEventListener("resize",()=>{for(const id in pal)place(id)});
+addEventListener("keydown",e=>{
+  if((e.target.closest&&e.target.closest("input,textarea,select"))||e.ctrlKey||e.metaKey||e.altKey)return;
+  if(e.key==="h"||e.key==="H")document.body.classList.toggle("imm");
+  const ids=Object.keys(pal),n=Number(e.key);
+  if(n>=1&&n<=ids.length)setOpen(ids[n-1],!saved[ids[n-1]].open);
+});
+
+/* ---------- Construction des palettes ---------- */
+const GROUPS=[["stations","Stations spatiales"],["active","Objets actifs"],["visual","Visibles à l'œil nu"],["weather","Météo"],["gps-ops","GPS opérationnels"],["geo","Géostationnaires"]];
+const TARGETS=[["sun","Soleil"],["mercury","Mercure"],["venus","Vénus"],["earth","Terre"],["moon","Lune"],["mars","Mars"],["jupiter","Jupiter"],["saturn","Saturne"],["uranus","Uranus"],["neptune","Neptune"]];
+for(const[v,l]of GROUPS){const o=h("option","",l);o.value=v;$("grp").append(o)}
+for(const[v,l]of TARGETS){const o=h("option","",l);o.value=v;$("eT").append(o)}
+$("eT").value="earth";
+const ov={},ev={};
+kvRows($("oRows"),[["n","NORAD"],["ep","Époque des éléments"],["age","Âge des éléments"],["per","Période"],["inc","Inclinaison"],["ecc","Excentricité"],["alt","Altitude"],["lat","Latitude"],["lon","Longitude"],["spd","Vitesse"]],ov);
+kvRows($("eRows"),[["t","Cible"],["d","Date (TDB)"],["x","X"],["y","Y"],["z","Z"],["v","Vitesse"],["r","Distance au barycentre"],["s","Source"]],ev);
+
+/* ---------- État ---------- */
+let viewer,pts,selEnt,traceEnt,selPos,live=null,eage=null,ephRow=null;
+let catalogue=[],sats=[],byItem=new Map(),selected=null,curGroup="stations",total=0,stale=false;
+let simMs=Date.now(),speed=1,lastTs=performance.now(),lastDigest="",lastFetch=null,showLabel=true;
+const SGP4=!!(window.satellite&&satellite.json2satrec);
+
+/* ---------- Globe ---------- */
+function setBase(kind){
+  viewer.imageryLayers.removeAll();
+  viewer.imageryLayers.addImageryProvider(new Cesium.UrlTemplateImageryProvider(kind==="osm"
+    ?{url:"https://tile.openstreetmap.org/{z}/{x}/{y}.png",credit:"© OpenStreetMap contributors",maximumLevel:19}
+    :{url:"https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/BlueMarble_ShadedRelief_Bathymetry/default/GoogleMapsCompatible_Level8/{z}/{y}/{x}.jpeg",credit:"Imagery © NASA GIBS / Blue Marble",maximumLevel:8}));
+}
+const homeView=()=>viewer&&viewer.camera.flyTo({destination:Cesium.Cartesian3.fromDegrees(12,14,23500000),duration:1.3});
+function initGlobe(){
+  if(!window.Cesium){toast("Bibliothèque 3D indisponible : vérifiez la connexion.");return}
+  try{
+    viewer=new Cesium.Viewer("globe",{animation:false,timeline:false,baseLayerPicker:false,geocoder:false,homeButton:false,sceneModePicker:false,navigationHelpButton:false,fullscreenButton:false,infoBox:false,selectionIndicator:false,baseLayer:false,shouldAnimate:false,terrainProvider:new Cesium.EllipsoidTerrainProvider()});
+    setBase("nasa");
+    const sc=viewer.scene;
+    sc.globe.enableLighting=true;sc.globe.baseColor=Cesium.Color.fromCssColorString("#0a1424");
+    sc.backgroundColor=Cesium.Color.fromCssColorString("#0a0e17");
+    sc.screenSpaceCameraController.minimumZoomDistance=500000;sc.screenSpaceCameraController.maximumZoomDistance=60000000;
+    viewer.camera.setView({destination:Cesium.Cartesian3.fromDegrees(12,14,23500000)});
+    pts=sc.primitives.add(new Cesium.PointPrimitiveCollection());
+    selEnt=viewer.entities.add({position:new Cesium.CallbackProperty(()=>selPos,false),show:false,
+      point:{pixelSize:11,color:Cesium.Color.fromCssColorString("#f5b942"),outlineColor:Cesium.Color.BLACK,outlineWidth:1},
+      label:{text:"",font:"13px system-ui",showBackground:true,backgroundColor:Cesium.Color.fromCssColorString("#0a0e17").withAlpha(.8),fillColor:Cesium.Color.WHITE,pixelOffset:new Cesium.Cartesian2(0,-20)}});
+    viewer.screenSpaceEventHandler.setInputAction(c=>{const p=viewer.scene.pick(c.position);if(p&&p.id&&p.id.rec)selectObject(p.id)},Cesium.ScreenSpaceEventType.LEFT_CLICK);
+  }catch(e){console.error(e);toast("Échec de l'initialisation du globe.")}
+}
+
+/* ---------- Propagation SGP4 ---------- */
+function ecef(s,d,g){
+  const pv=satellite.propagate(s.rec,d);
+  if(!pv||typeof pv.position!=="object")return null;
+  const e=satellite.eciToEcf(pv.position,g);
+  return Number.isFinite(e.x+e.y+e.z)?new Cesium.Cartesian3(e.x*1e3,e.y*1e3,e.z*1e3):null;
+}
+function updateSelected(d,g){
+  if(!selected||!selected.rec)return;
+  const pv=satellite.propagate(selected.rec,d);
+  eage=(simMs-epochMs(selected.it.EPOCH))/864e5;
+  ov.age.textContent=num(eage,1," j");ov.age.style.color=eage<=3?"var(--ok)":eage<=10?"var(--ac)":"var(--bad)";
+  if(!pv||typeof pv.position!=="object"||!pv.velocity){live=null;selPos=undefined;selEnt.show=false;ov.alt.textContent=ov.lat.textContent=ov.lon.textContent=ov.spd.textContent="indisponible";return}
+  const geo=satellite.eciToGeodetic(pv.position,g),e=satellite.eciToEcf(pv.position,g),v=pv.velocity;
+  live={lat:satellite.degreesLat(geo.latitude),lon:satellite.degreesLong(geo.longitude),alt:geo.height,spd:Math.hypot(v.x,v.y,v.z)};
+  selPos=new Cesium.Cartesian3(e.x*1e3,e.y*1e3,e.z*1e3);selEnt.show=true;selEnt.label.show=showLabel;
+  ov.lat.textContent=num(live.lat,3,"°");ov.lon.textContent=num(live.lon,3,"°");ov.alt.textContent=num(live.alt,1," km");ov.spd.textContent=num(live.spd,2," km/s");
+}
+function tick(){
+  const n=performance.now();simMs+=(n-lastTs)*speed;lastTs=n;
+  const d=new Date(simMs);$("simT").textContent=d.toISOString().replace("T"," ").slice(0,19);
+  $("tAge").textContent=ago(lastFetch);
+  if(!viewer)return;
+  viewer.clock.currentTime=Cesium.JulianDate.fromDate(d);
+  if(!SGP4)return;
+  const g=satellite.gstime(d),vis=$("showPts").checked;
+  for(const s of sats){const p=ecef(s,d,g);s.pt.show=!!p&&vis;if(p)s.pt.position=p}
+  updateSelected(d,g);
+}
+function drawTrace(){
+  if(traceEnt){viewer.entities.remove(traceEnt);traceEnt=null}
+  if(!viewer||!SGP4||!selected||!selected.rec||!$("trace").checked)return;
+  const per=1440/Number(selected.it.MEAN_MOTION)*60000,arr=[];
+  if(!Number.isFinite(per))return;
+  for(let i=0;i<=120;i++){const d=new Date(simMs+per*i/120),p=ecef(selected,d,satellite.gstime(d));if(p)arr.push(p)}
+  if(arr.length>1)traceEnt=viewer.entities.add({polyline:{positions:arr,width:1.5,arcType:Cesium.ArcType.NONE,material:Cesium.Color.fromCssColorString("#f5b942").withAlpha(.7)}});
+}
+function flyToSel(){if(viewer&&live)viewer.camera.flyTo({destination:Cesium.Cartesian3.fromDegrees(live.lon,live.lat,Math.max(live.alt*3e3,6e6)),duration:1.2})}
+
+/* ---------- Catalogue ---------- */
+function buildSats(){
+  sats=[];byItem=new Map();
+  if(pts)pts.removeAll();
+  if(!SGP4||!pts)return;
+  for(const it of catalogue){
+    let rec;try{rec=satellite.json2satrec(it)}catch(_){continue}
+    if(!rec||rec.error)continue;
+    const s={it,rec};s.pt=pts.add({position:Cesium.Cartesian3.ZERO,pixelSize:4,color:Cesium.Color.fromCssColorString("#4fd1c5"),show:false,id:s});
+    sats.push(s);byItem.set(it,s);
+  }
+}
+function renderList(){
+  const qy=$("q").value.trim().toLowerCase(),box=$("list");
+  const rows=catalogue.filter(it=>String(it.OBJECT_NAME||"").toLowerCase().includes(qy)||String(it.NORAD_CAT_ID||"").includes(qy)).slice(0,200);
+  if(!rows.length){box.replaceChildren(h("div","empty","Aucun objet ne correspond."));return}
+  box.replaceChildren(...rows.map(it=>{
+    const b=h("button","item"+(selected&&selected.it===it?" on":""));b.type="button";
+    b.append(h("span","",it.OBJECT_NAME||"Sans nom"),h("small","",it.NORAD_CAT_ID??""));
+    b.onclick=()=>selectObject(byItem.get(it)||{it});return b;
+  }));
+}
+async function loadCatalogue(group){
+  curGroup=group||curGroup;$("load").disabled=true;
+  $("list").replaceChildren(h("div","empty","Chargement du catalogue…"));
+  const t0=performance.now();
+  try{
+    const r=await api("/api/v1/satellites?group="+encodeURIComponent(curGroup));
+    catalogue=Array.isArray(r.data)?r.data:[];total=r.total||catalogue.length;stale=!!r.stale;
+    lastDigest=r.sha256||"";lastFetch=r.fetched_at;selected=null;selEnt&&(selEnt.show=false);drawTrace();
+    buildSats();renderList();tick();
+    $("tCount").textContent=catalogue.length.toLocaleString("fr-FR");
+    $("tInt").textContent=lastDigest?"Vérifiée*":"—";$("tDig").textContent=lastDigest?lastDigest.slice(0,16)+"…":"—";
+    $("catNote").textContent=(total>catalogue.length?`${catalogue.length.toLocaleString("fr-FR")} objets affichés sur ${total.toLocaleString("fr-FR")}. `:"")+(SGP4?"":"Propagation SGP4 indisponible. ")+`Réponse en ${Math.round(performance.now()-t0)} ms.`;
+    setPill("pCt",stale?"Cache périmé":"Connecté",stale?"w":"");
+    setConn(!stale,stale?"Données en cache":"Liaison opérationnelle");
+  }catch(e){
+    $("list").replaceChildren(h("div","empty","Catalogue indisponible : "+e.message));
+    setPill("pCt","Indisponible","b");setConn(false,"Liaison dégradée");toast("Catalogue : "+e.message);
+  }finally{$("load").disabled=false}
+}
+function selectObject(s){
+  selected=s;const it=s.it;
+  $("oName").textContent=it.OBJECT_NAME||"Objet sans nom";
+  ov.n.textContent=it.NORAD_CAT_ID??"—";ov.ep.textContent=it.EPOCH?String(it.EPOCH).replace("T"," ").slice(0,19)+" UTC":"—";
+  ov.per.textContent=num(1440/Number(it.MEAN_MOTION),1," min");ov.inc.textContent=num(it.INCLINATION,2,"°");ov.ecc.textContent=num(it.ECCENTRICITY,5);
+  if(selEnt)selEnt.label.text=it.OBJECT_NAME||"";
+  live=null;renderList();setOpen("obj",true);
+  if(SGP4&&s.rec){tick();drawTrace();flyToSel()}else toast("Positions indisponibles pour cet objet.");
+}
+
+/* ---------- Éphémérides JPL ---------- */
+async function loadEph(){
+  const f=x=>x.toISOString().slice(0,10),d0=new Date(),d1=new Date(d0.getTime()+864e5);
+  $("eGo").disabled=true;
+  try{
+    const r=await api("/api/v1/jpl/vectors?target="+$("eT").value+"&start="+f(d0)+"&stop="+f(d1)+"&step=1%20d");
+    const v=(r.vectors||[])[0];if(!v)throw new Error("Réponse JPL sans vecteur exploitable.");
+    const sp=Math.hypot(v.vx,v.vy,v.vz),dist=Math.hypot(v.x,v.y,v.z);
+    ev.t.textContent=r.target;ev.d.textContent=v.date;ev.x.textContent=num(v.x,0," km");ev.y.textContent=num(v.y,0," km");ev.z.textContent=num(v.z,0," km");
+    ev.v.textContent=num(sp,3," km/s");ev.r.textContent=num(dist/1e6,2," M km");
+    ev.s.textContent=r.source+" · il y a "+ago(r.fetched_at)+(r.stale?" · cache périmé":"");
+    ephRow={target:r.target,date_tdb:v.date,x_km:v.x,y_km:v.y,z_km:v.z,speed_km_s:sp,distance_km:dist,source:r.source,stale:!!r.stale,sha256_prefix:(r.sha256||"").slice(0,16)};
+    setPill("pJpl","Connecté","");
+  }catch(e){toast("JPL : "+e.message);setPill("pJpl","Indisponible","b")}
+  finally{$("eGo").disabled=false}
+}
+
+/* ---------- Assistant IA (Gemini) ---------- */
+function bubble(kind,text){const m=h("div","msg "+kind,text);$("chat").append(m);while($("chat").children.length>40)$("chat").firstChild.remove();m.scrollIntoView({block:"end"});return m}
+function ctx(){
+  const it=selected&&selected.it;
+  return{catalogue:{group:curGroup,loaded:catalogue.length,total_upstream:total,stale,fetched_at:lastFetch,sha256_prefix:lastDigest.slice(0,16)},
+    simulated_time_utc:new Date(simMs).toISOString(),
+    selected:it?{name:it.OBJECT_NAME,norad_id:it.NORAD_CAT_ID,element_epoch:it.EPOCH,element_age_days:eage,inclination_deg:it.INCLINATION,eccentricity:it.ECCENTRICITY,mean_motion_rev_per_day:it.MEAN_MOTION,period_min:1440/Number(it.MEAN_MOTION),live}:null,
+    ephemeris:ephRow};
+}
+async function ask(question){
+  question=question.trim();if(question.length<2)return;
+  setOpen("ai",true);bubble("me",question);const wait=bubble("ai","Analyse en cours…");$("aiGo").disabled=true;
+  try{
+    const r=await api("/api/v1/ai/analyze",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({question,context:ctx()})});
+    wait.textContent=r.answer;
+  }catch(e){wait.textContent="Assistant indisponible : "+e.message;wait.classList.add("err")}
+  finally{$("aiGo").disabled=false;wait.scrollIntoView({block:"end"})}
+}
+bubble("ai","Je suis l'assistant d'AgAtA-EyEs. Sélectionnez un objet, puis posez votre question sur ses éléments orbitaux, la fraîcheur des données ou leurs limites.");
+for(const q of ["Résume l'objet sélectionné","Que montre le catalogue chargé ?","Quelles sont les limites de ces données ?"]){const b=h("button","chip",q);b.type="button";b.onclick=()=>ask(q);$("chips").append(b)}
+$("aiGo").onclick=()=>{const v=$("aiQ").value;$("aiQ").value="";ask(v)};
+$("aiQ").addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();$("aiGo").click()}});
+
+/* ---------- Système et journal ---------- */
+async function loadStatus(){
+  try{
+    const s=await api("/api/v1/status");
+    setPill("pDb",s.database==="supabase"?"Supabase":"Mémoire (non durable)",s.database==="supabase"?"":"w");
+    setPill("pAi",s.ai.enabled?"Gemini actif":"Non configuré",s.ai.enabled?"":"w");
+  }catch(_){setPill("pDb","Injoignable","b");setPill("pAi","Inconnu","w")}
+}
+async function loadAudit(){
+  try{
+    const r=await api("/api/v1/audit?limit=6");
+    $("audit").replaceChildren(...(r.events.length?r.events.map(e=>{const d=h("div","kv");d.append(h("span","",String(e.timestamp||"").slice(11,19)),h("b","",e.event+" · "+e.source));return d}):[h("div","empty","Aucun événement.")]));
+  }catch(e){$("audit").replaceChildren(h("div","empty","Journal indisponible : "+e.message))}
+}
+
+/* ---------- Commandes ---------- */
+$("load").onclick=()=>loadCatalogue($("grp").value);
+$("q").addEventListener("input",renderList);
+$("eGo").onclick=loadEph;
+$("aRef").onclick=()=>{loadStatus();loadAudit()};
+$("aDoc").onclick=()=>window.open("/docs","_blank","noopener,noreferrer");
+$("base").onchange=e=>viewer&&setBase(e.target.value);
+$("spd").onchange=e=>{speed=Number(e.target.value)};
+$("showLbl").onchange=e=>{showLabel=e.target.checked};
+$("trace").onchange=drawTrace;
+$("vNow").onclick=()=>{simMs=Date.now()};
+$("vHome").onclick=homeView;
+$("vImm").onclick=()=>document.body.classList.add("imm");
+$("oCenter").onclick=()=>live?flyToSel():toast("Sélectionnez d'abord un objet.");
+$("oAi").onclick=()=>selected?ask("Résume l'orbite de cet objet et précise la fiabilité de ses éléments."):toast("Sélectionnez d'abord un objet.");
+$("oApi").onclick=()=>{const id=selected&&selected.it.NORAD_CAT_ID;id?window.open("/api/v1/satellites/"+encodeURIComponent(id),"_blank","noopener,noreferrer"):toast("Aucun numéro NORAD pour cet objet.")};
+
+initGlobe();
+if(!SGP4)toast("Propagation SGP4 indisponible : le catalogue s'affiche sans positions.");
+setInterval(tick,1000);
+loadCatalogue("stations");loadStatus();loadAudit();
+})();
+</script>
+</body>
+</html>
