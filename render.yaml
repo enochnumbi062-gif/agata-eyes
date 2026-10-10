@@ -1,0 +1,34 @@
+services:
+  - type: web
+    name: agata-eyes
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips "*"
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.8
+      - key: LOG_LEVEL
+        value: INFO
+      - key: CACHE_TTL_SECONDS
+        value: "7200"
+      - key: HTTP_TIMEOUT_SECONDS
+        value: "12"
+      - key: MAX_REQUESTS_PER_MINUTE
+        value: "120"
+      - key: AI_MAX_PER_MINUTE
+        value: "6"
+      - key: AI_DAILY_LIMIT
+        value: "300"
+      - key: MAX_OBJECTS
+        value: "3000"
+      - key: GEMINI_MODELS
+        value: gemini-3.5-flash,gemini-3.1-flash-lite,gemini-2.5-flash
+      # Secrets: à saisir dans le tableau de bord Render (jamais dans Git)
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
