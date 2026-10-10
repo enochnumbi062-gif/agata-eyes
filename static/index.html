@@ -47,7 +47,7 @@ label.f{display:flex;flex-direction:column;gap:4px;color:var(--mu)}
 .chips{display:flex;flex-wrap:wrap;gap:6px}.chip{border:1px solid var(--line);border-radius:99px;background:none;padding:4px 10px;cursor:pointer;color:var(--mu)}.chip:hover{color:var(--ac);border-color:var(--ac)}
 textarea.in{resize:none}h3{margin:0;font-size:16px}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:90;background:#131c30;border:1px solid var(--line);border-radius:10px;padding:9px 14px;max-width:90vw}.toast:empty{display:none}
-@media(max-width:700px){.dock{top:auto;bottom:10px;left:50%;transform:translateX(-50%);flex-direction:row}.pal{left:8px!important;right:8px;top:auto!important;bottom:68px;width:auto!important;height:auto!important;max-height:58vh;resize:none}.brand span{display:none}}
+@media(max-width:700px){.dock{top:auto;bottom:10px;left:50%;transform:translateX(-50%);flex-direction:row}.pal{left:8px!important;right:8px;top:auto!important;bottom:68px;width:auto!important;height:auto!important;max-height:58vh;resize:none}.brand span{display:none}.toast{bottom:76px}}
 </style>
 </head>
 <body>
@@ -303,22 +303,28 @@ function renderList(){
     b.onclick=()=>selectObject(byItem.get(it)||{it});return b;
   }));
 }
+async function direct(group){
+  const r=await fetch("https://celestrak.org/NORAD/elements/gp.php?GROUP="+encodeURIComponent(group)+"&FORMAT=JSON");
+  if(!r.ok)throw new Error("HTTP "+r.status);
+  const a=await r.json();if(!Array.isArray(a))throw new Error("réponse invalide");
+  return{data:a.slice(0,3000),total:a.length,stale:false,sha256:"",fetched_at:new Date().toISOString(),direct:true};
+}
 async function loadCatalogue(group){
   curGroup=group||curGroup;$("load").disabled=true;
   $("list").replaceChildren(h("div","empty","Chargement du catalogue…"));
   const t0=performance.now();
   try{
-    const r=await api("/api/v1/satellites?group="+encodeURIComponent(curGroup));
+    let r;try{r=await api("/api/v1/satellites?group="+encodeURIComponent(curGroup))}catch(err){try{r=await direct(curGroup);toast("Le serveur n'accède pas à CelesTrak : chargement direct depuis votre navigateur.")}catch(_){throw err}}
     catalogue=Array.isArray(r.data)?r.data:[];total=r.total||catalogue.length;stale=!!r.stale;
     lastDigest=r.sha256||"";lastFetch=r.fetched_at;selected=null;selEnt&&(selEnt.show=false);drawTrace();
     buildSats();renderList();tick();
     $("tCount").textContent=catalogue.length.toLocaleString("fr-FR");
     $("tInt").textContent=lastDigest?"Vérifiée*":"—";$("tDig").textContent=lastDigest?lastDigest.slice(0,16)+"…":"—";
     $("catNote").textContent=(total>catalogue.length?`${catalogue.length.toLocaleString("fr-FR")} objets affichés sur ${total.toLocaleString("fr-FR")}. `:"")+(SGP4?"":"Propagation SGP4 indisponible. ")+`Réponse en ${Math.round(performance.now()-t0)} ms.`;
-    setPill("pCt",stale?"Cache périmé":"Connecté",stale?"w":"");
-    setConn(!stale,stale?"Données en cache":"Liaison opérationnelle");
+    setPill("pCt",r.direct?"Direct navigateur":stale?"Cache périmé":"Connecté",r.direct||stale?"w":"");
+    setConn(!stale&&!r.direct,r.direct?"Mode direct navigateur":stale?"Données en cache":"Liaison opérationnelle");
   }catch(e){
-    $("list").replaceChildren(h("div","empty","Catalogue indisponible : "+e.message));
+    $("list").replaceChildren(h("div","empty","Catalogue indisponible : "+e.message));$("catNote").textContent="Échec du chargement.";
     setPill("pCt","Indisponible","b");setConn(false,"Liaison dégradée");toast("Catalogue : "+e.message);
   }finally{$("load").disabled=false}
 }
